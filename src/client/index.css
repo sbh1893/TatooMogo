@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/* shadcn/ui design tokens. Primary = demo navy (#1f3a5f). */
+:root {
+  --background: #ffffff;
+  --foreground: #1a202c;
+  --primary: #1f3a5f;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f5;
+  --secondary-foreground: #1a202c;
+  --muted: #f3f5f8;
+  --muted-foreground: #5a6577;
+  --accent: #f3f5f8;
+  --accent-foreground: #1a202c;
+  --destructive: #c53030;
+  --border: #cfd6df;
+  --input: #cfd6df;
+  --ring: #2c5282;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    color: var(--foreground);
+  }
+}

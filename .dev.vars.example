@@ -1,0 +1,14 @@
+# Copy to .dev.vars (git-ignored) for local development.
+#   PowerShell:  Copy-Item .dev.vars.example .dev.vars
+#   macOS/Linux: cp .dev.vars.example .dev.vars
+
+# Turns on the local admin bypass below. Never set this in production.
+ENVIRONMENT=development
+
+# Treated as the logged-in admin locally (no Cloudflare Access in local dev).
+# Must also exist in the admins table — `npm run db:seed:local` inserts it as super_admin.
+ADMIN_DEV_EMAIL=dev@example.com
+
+# Production only (set with `wrangler secret put`, see docs/SETUP.md):
+# ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
+# ACCESS_AUD=<Application Audience (AUD) tag>
