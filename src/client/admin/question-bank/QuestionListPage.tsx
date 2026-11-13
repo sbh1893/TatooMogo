@@ -100,7 +100,44 @@ export function QuestionListPage() {
 
       {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
-      <div className="overflow-x-auto rounded-lg border bg-white">
+      {/* Under 640px: one card per question instead of a table. */}
+      <ul className="space-y-2 sm:hidden">
+        {data?.items.map((item) => (
+          <li key={item.id} className="rounded-lg border bg-white p-3">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="font-mono">
+                #{item.code}
+                {item.version > 1 && ` v${item.version}`}
+              </span>
+              <span>{item.subjectName}</span>
+              <span className="ml-auto">
+                <StatusBadge status={item.status} />
+              </span>
+            </div>
+            <Link to={`/admin/questions/${item.id}`} className="mt-1 line-clamp-3 text-sm hover:underline">
+              {item.stemPreview}
+            </Link>
+            {item.used && (
+              <Badge variant="outline" className="mt-1">
+                응시 기록 있음
+              </Badge>
+            )}
+            <div className="mt-2 flex justify-end gap-1">
+              <Button asChild size="sm" variant="outline">
+                <Link to={`/admin/questions/${item.id}`}>수정</Link>
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => toggle(item)}>
+                {item.status === "disabled" ? "재사용" : "중지"}
+              </Button>
+            </div>
+          </li>
+        ))}
+        {data && data.items.length === 0 && (
+          <li className="rounded-lg border bg-white py-10 text-center text-sm text-slate-500">조건에 맞는 문항이 없습니다.</li>
+        )}
+      </ul>
+
+      <div className="hidden overflow-x-auto rounded-lg border bg-white sm:block">
         <Table>
           <TableHeader>
             <TableRow>

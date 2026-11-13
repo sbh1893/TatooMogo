@@ -23,12 +23,15 @@ export function AdminLayout() {
           <NavLink to="/admin/questions" className={navClass}>
             문제은행
           </NavLink>
+          <NavLink to="/admin/import" className={navClass}>
+            PDF 가져오기
+          </NavLink>
         </nav>
         <span className="ml-auto truncate text-xs opacity-80">
           {me ? `${me.email} · ${me.role === "super_admin" ? "최고관리자" : "관리자"}` : ""}
         </span>
       </header>
-      <main className="mx-auto max-w-6xl p-3 sm:p-6">
+      <main className="mx-auto max-w-7xl p-3 sm:p-6">
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-800">{error}</div>
         ) : me ? (

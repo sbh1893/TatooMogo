@@ -1,4 +1,4 @@
-import type { SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { auditLogs, type Admin } from "../../db/schema";
 import type { Ctx, Db } from "../env";
 
@@ -10,7 +10,9 @@ export type AuditAction =
   | "question.update"
   | "question.version"
   | "question.disable"
-  | "question.enable";
+  | "question.enable"
+  | "question.import"
+  | "source.upload";
 
 /**
  * Builds (does not run) an audit insert so callers can put it in the same D1 batch
@@ -33,4 +35,19 @@ export function auditInsert(
     detail: detail ?? null,
     ip: c.req.header("CF-Connecting-IP") ?? null,
   });
+}
+
+/** Same, but the row is written only if `when` holds at batch time (use with rawBatch). */
+export function auditInsertIf(
+  c: Ctx,
+  when: SQL,
+  action: AuditAction,
+  target: { type: string; id: string | SQL },
+  detail?: Record<string, unknown>,
+) {
+  const admin = c.get("admin");
+  return sql`insert into audit_logs (admin_id, admin_email, action, target_type, target_id, detail, ip, created_at)
+    select ${admin.id}, ${admin.email}, ${action}, ${target.type}, ${target.id}, ${detail ? JSON.stringify(detail) : null},
+      ${c.req.header("CF-Connecting-IP") ?? null}, ${Date.now()}
+    where ${when}`;
 }

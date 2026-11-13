@@ -1,8 +1,8 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { subjects } from "../../db/schema";
-import { fail, getDb, isUniqueViolation, type AppEnv } from "../env";
-import { auditInsert } from "./audit";
+import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv } from "../env";
+import { auditInsert, auditInsertIf } from "./audit";
 
 function parse(raw: unknown, partial: boolean) {
   const o = (raw ?? {}) as { name?: unknown; sortOrder?: unknown };
@@ -46,12 +46,15 @@ export const subjectRoutes = new Hono<AppEnv>()
     const db = getDb(c.env);
     const id = Number(c.req.param("id"));
     try {
-      const [rows] = await db.batch([
+      const [res] = await rawBatch(c.env, [
         db.update(subjects).set(v).where(eq(subjects.id, id)).returning(),
-        auditInsert(db, c, "subject.update", { type: "subject", id: String(id) }, v),
+        // Only audit a change that happened: no row, no log.
+        auditInsertIf(c, sql`exists(select 1 from subjects where id = ${id})`, "subject.update", { type: "subject", id: String(id) }, v),
       ]);
+      const rows = res.results as { id: number; name: string; sort_order: number; created_at: number }[];
       if (!rows[0]) return fail(c, 404, "not_found", "과목을 찾을 수 없습니다.");
-      return c.json(rows[0]);
+      const r = rows[0];
+      return c.json({ id: r.id, name: r.name, sortOrder: r.sort_order, createdAt: r.created_at });
     } catch (e) {
       if (isUniqueViolation(e)) return fail(c, 409, "duplicate", "같은 이름의 과목이 있습니다.");
       throw e;

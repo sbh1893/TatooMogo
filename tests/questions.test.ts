@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { call, resetDb } from "./helpers";
+import { call, devEnv, resetDb } from "./helpers";
 
 beforeEach(resetDb);
 
@@ -108,6 +108,34 @@ describe("question bank API", () => {
     expect(await auditActions()).toEqual(["question.create", "question.disable", "question.enable"]);
   });
 
+  it("decides edit-vs-version inside the batch, so an attempt starting mid-request still forces a new version", async () => {
+    const q = await create("원래 지문");
+    // The attempt lands after the handler has read the question but before its write batch runs.
+    let fired = false;
+    const DB = new Proxy(env.DB, {
+      get(target, prop) {
+        if (prop === "batch")
+          return async (stmts: D1PreparedStatement[]) => {
+            if (!fired) {
+              fired = true;
+              await addAttemptFor(q.id);
+            }
+            return target.batch(stmts);
+          };
+        const v = Reflect.get(target, prop);
+        return typeof v === "function" ? v.bind(target) : v;
+      },
+    });
+    const res = await call(`/api/admin/questions/${q.id}`, { method: "PUT", json: input("고친 지문") }, { ...devEnv(), DB });
+    expect(fired).toBe(true);
+    expect(await res.json()).toMatchObject({ code: q.code, version: 2, newVersion: true });
+    const old = await env.DB.prepare("SELECT stem, is_latest FROM questions WHERE id = ?").bind(q.id).first();
+    expect(old).toEqual({ stem: "원래 지문", is_latest: 0 });
+    const oldChoices = await env.DB.prepare("SELECT count(*) AS n FROM choices WHERE question_id = ?").bind(q.id).first<{ n: number }>();
+    expect(oldChoices?.n).toBe(5);
+    expect(await auditActions()).toEqual(["question.create", "question.version"]);
+  });
+
   it("searches by stem text and by common number", async () => {
     await create("오토클레이브 조건");
     await create("켈로이드 설명");
@@ -115,6 +143,26 @@ describe("question bank API", () => {
     expect(byText.items.map((i) => i.code)).toEqual([2]);
     const byCode = await (await call("/api/admin/questions?q=1")).json<{ items: { code: number }[] }>();
     expect(byCode.items.map((i) => i.code)).toEqual([1]);
+  });
+
+  it("treats % and _ in the search term as plain text", async () => {
+    await create("소독액 100% 원액 사용");
+    await create("소독액 1000배 희석");
+    await create("A_B 표시");
+    const search = async (term: string) =>
+      (await (await call(`/api/admin/questions?q=${encodeURIComponent(term)}`)).json<{ items: { code: number }[] }>()).items.map((i) => i.code);
+    expect(await search("100%")).toEqual([1]);
+    expect(await search("%")).toEqual([1]);
+    expect(await search("_")).toEqual([3]);
+    expect(await search("A_B")).toEqual([3]);
+  });
+
+  it("does not audit a subject update when the subject does not exist", async () => {
+    const res = await call("/api/admin/subjects/99", { method: "PATCH", json: { name: "없는 과목" } });
+    expect(res.status).toBe(404);
+    expect(await auditActions()).toEqual([]);
+    expect((await call("/api/admin/subjects/1", { method: "PATCH", json: { name: "위생관리" } })).status).toBe(200);
+    expect(await auditActions()).toEqual(["subject.update"]);
   });
 
   it("blocks cross-site form posts (CSRF)", async () => {

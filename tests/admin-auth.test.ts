@@ -81,6 +81,12 @@ describe("requireAdmin", () => {
       ["PUT", "/api/admin/questions/1"],
       ["POST", "/api/admin/questions/1/disable"],
       ["GET", "/api/admin/subjects"],
+      ["POST", "/api/admin/questions/bulk"],
+      ["GET", "/api/admin/source-files"],
+      ["POST", "/api/admin/source-files"],
+      ["GET", "/api/admin/source-files/1/file"],
+      ["POST", "/api/admin/media"],
+      ["GET", "/api/admin/media/0a.png"],
     ]) {
       const res = await call(path, { method, json: method === "GET" ? undefined : {} }, prodEnv());
       expect(res.status, `${method} ${path}`).toBe(401);

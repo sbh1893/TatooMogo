@@ -57,3 +57,13 @@ export type QuestionDetail = {
   versions: { id: number; version: number; status: QuestionStatus; createdAt: number }[];
 };
 export type SaveResult = { id: number; code: number; version: number; newVersion: boolean };
+
+export type SourceFile = {
+  id: number;
+  filename: string;
+  roundLabel: string | null;
+  sizeBytes: number;
+  kind: "text" | "scan" | null;
+  status: "uploaded" | "reviewing" | "done" | "failed";
+  createdAt: number;
+};

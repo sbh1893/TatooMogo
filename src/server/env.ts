@@ -1,5 +1,7 @@
 import type { Context } from "hono";
+import { is, SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import { SQLiteAsyncDialect } from "drizzle-orm/sqlite-core";
 import type { Admin } from "../db/schema";
 
 export type Bindings = {
@@ -20,6 +22,23 @@ export type Ctx = Context<AppEnv>;
 
 export const getDb = (env: Bindings) => drizzle(env.DB);
 export type Db = ReturnType<typeof getDb>;
+
+const dialect = new SQLiteAsyncDialect();
+type Built = SQL | { toSQL(): { sql: string; params: unknown[] } };
+
+/**
+ * D1 batch (one transaction) over drizzle builders and raw `sql` fragments alike.
+ * drizzle's own db.batch() can't take raw INSERT ... SELECT ... WHERE statements,
+ * which conditional writes need. Returns raw D1 results (column names as in SQL).
+ */
+export function rawBatch(env: Bindings, items: Built[]) {
+  return env.DB.batch(
+    items.map((i) => {
+      const q = is(i, SQL) ? dialect.sqlToQuery(i) : i.toSQL();
+      return env.DB.prepare(q.sql).bind(...q.params);
+    }),
+  );
+}
 
 export function fail(c: Context, status: 400 | 401 | 403 | 404 | 409 | 500, code: string, message: string) {
   return c.json({ error: { code, message } }, status);

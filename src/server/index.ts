@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
 import { questionRoutes } from "./admin/questions";
+import { mediaRoutes, sourceRoutes } from "./admin/sources";
 import { subjectRoutes } from "./admin/subjects";
 import { requireAdmin } from "./auth/middleware";
 import { fail, type AppEnv } from "./env";
@@ -15,7 +16,9 @@ const admin = new Hono<AppEnv>()
     return c.json({ email, role });
   })
   .route("/subjects", subjectRoutes)
-  .route("/questions", questionRoutes);
+  .route("/questions", questionRoutes)
+  .route("/source-files", sourceRoutes)
+  .route("/media", mediaRoutes);
 
 const app = new Hono<AppEnv>()
   .route("/api/admin", admin)
