@@ -37,11 +37,4 @@ export async function cropToPng(pageCanvas: HTMLCanvasElement, ref: ImageRef): P
   return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("이미지를 만들지 못했습니다."))), "image/png"));
 }
 
-export async function uploadMedia(blob: Blob): Promise<string> {
-  const form = new FormData();
-  form.set("file", new File([blob], "crop.png", { type: "image/png" }));
-  const res = await fetch("/api/admin/media", { method: "POST", body: form, credentials: "same-origin" });
-  const data = (await res.json().catch(() => null)) as { key?: string; error?: { message: string } } | null;
-  if (!res.ok || !data?.key) throw new Error(data?.error?.message ?? "그림을 올리지 못했습니다.");
-  return data.key;
-}
+export { uploadMedia } from "@/lib/api";

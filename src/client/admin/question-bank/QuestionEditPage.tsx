@@ -5,8 +5,49 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api, errorMessage, type QuestionDetail, type SaveResult, type Subject } from "@/lib/api";
+import { api, errorMessage, mediaUrl, uploadMedia, type QuestionDetail, type SaveResult, type Subject } from "@/lib/api";
 import { StatusBadge, selectClass } from "./common";
+
+/** Shows a stem/choice picture with remove, or a button to upload one (PNG/JPEG, 2MB). */
+function ImageField({ value, onChange, label }: { value?: string | null; onChange: (key: string | null) => void; label: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (value)
+    return (
+      <div className="flex items-start gap-2">
+        <img src={mediaUrl(value)} alt={label} className="max-h-48 max-w-full rounded border bg-white" />
+        <Button type="button" size="sm" variant="ghost" onClick={() => onChange(null)}>
+          그림 빼기
+        </Button>
+      </div>
+    );
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+      <span className="rounded border px-2 py-1 hover:bg-slate-50">{busy ? "올리는 중…" : `${label} 올리기`}</span>
+      <input
+        type="file"
+        accept="image/png,image/jpeg"
+        className="sr-only"
+        disabled={busy}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          setBusy(true);
+          setError(null);
+          try {
+            onChange(await uploadMedia(file, file.name));
+          } catch (err) {
+            setError(errorMessage(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+      {error && <span className="text-red-700">{error}</span>}
+    </label>
+  );
+}
 
 const CIRCLED = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"];
 const emptyChoice = () => ({ body: "", imageKey: null, isCorrect: false });
@@ -157,6 +198,7 @@ function QuestionEditPage() {
         <div className="space-y-1.5">
           <Label htmlFor="stem">지문</Label>
           <Textarea id="stem" rows={4} value={form.stem} onChange={(e) => set("stem", e.target.value)} />
+          <ImageField label="지문 그림" value={form.stemImageKey} onChange={(k) => set("stemImageKey", k)} />
         </div>
 
         <div className="space-y-2">
@@ -177,13 +219,16 @@ function QuestionEditPage() {
                 <input type="radio" name="correct" checked={c.isCorrect} onChange={() => setChoice(i, { isCorrect: true })} />
                 <span className="w-5 text-center">{CIRCLED[i]}</span>
               </label>
-              <Textarea
-                rows={1}
-                aria-label={`${i + 1}번 보기`}
-                className="min-h-9"
-                value={c.body}
-                onChange={(e) => setChoice(i, { body: e.target.value })}
-              />
+              <div className="flex-1 space-y-1">
+                <Textarea
+                  rows={1}
+                  aria-label={`${i + 1}번 보기`}
+                  className="min-h-9"
+                  value={c.body}
+                  onChange={(e) => setChoice(i, { body: e.target.value })}
+                />
+                <ImageField label="보기 그림" value={c.imageKey} onChange={(k) => setChoice(i, { imageKey: k })} />
+              </div>
               <Button
                 type="button"
                 size="sm"

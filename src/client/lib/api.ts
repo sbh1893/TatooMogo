@@ -24,6 +24,19 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
   return data as T;
 }
 
+/** Uploads a PNG/JPEG for a stem or choice; returns its R2 key ("media/….png"). */
+export async function uploadMedia(blob: Blob, name = "image.png"): Promise<string> {
+  const form = new FormData();
+  form.set("file", new File([blob], name, { type: blob.type || "image/png" }));
+  const res = await fetch("/api/admin/media", { method: "POST", body: form, credentials: "same-origin" });
+  const data = (await res.json().catch(() => null)) as { key?: string; error?: { message: string } } | null;
+  if (!res.ok || !data?.key) throw new Error(data?.error?.message ?? "그림을 올리지 못했습니다.");
+  return data.key;
+}
+
+/** Admin URL of an uploaded picture. */
+export const mediaUrl = (key: string) => `/api/admin/${key}`;
+
 export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.");
 
 // Response shapes of /api/admin (kept next to the fetcher; the server is the source of truth).
