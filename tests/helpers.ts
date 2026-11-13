@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
-import app from "../src/server";
+import { app } from "../src/server";
 import { authDeps } from "../src/server/auth/middleware";
 import type { Bindings } from "../src/server/env";
 

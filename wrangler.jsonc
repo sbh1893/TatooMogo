@@ -29,6 +29,8 @@
       "bucket_name": "tatto-cbt-files"
     }
   ],
+  // Closes exam attempts whose time ran out while the examinee was offline (free Cron Trigger).
+  "triggers": { "crons": ["*/10 * * * *"] },
   "observability": {
     "enabled": true
   }

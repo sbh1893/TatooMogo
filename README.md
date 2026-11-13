@@ -53,6 +53,7 @@ Node.js 20 이상이 필요합니다. 아래 명령은 PowerShell과 macOS/Linux
 | `npm run db:migrate:local` / `db:migrate:remote` | 로컬 / 운영 D1에 마이그레이션 적용 |
 | `npm run db:seed:local` | 로컬 데모 데이터 |
 | `npm run db:bootstrap-admin -- <이메일> --remote` | 최초 최고관리자 등록 |
+| `npm run test:e2e` | Playwright: 수험자 2명 응시·채점 (로컬 개발 서버, 처음 한 번 `npx playwright install chromium`) |
 | `npm run split:measure` | 테스트 문제지(`docs/samples/test`)로 PDF 자동 분리 정확도 측정 |
 
 ## 직접 해야 하는 일

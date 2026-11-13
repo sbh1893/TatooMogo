@@ -129,6 +129,14 @@ describe("joinWrapped", () => {
     expect(joinWrapped("어려운", "것은?")).toBe("어려운 것은?");
     expect(joinWrapped("약 15psi,", "15분")).toBe("약 15psi, 15분");
   });
+
+  it("word mode (어절 단위) always puts a space at a line break", () => {
+    expect(joinWrapped("에탄올 농도", "범위는?", "word")).toBe("에탄올 농도 범위는?");
+    const [q] = splitPages([page([t("1. 알코올 농도", 40, 100), t("범위는?", 52, 114), t("① 가", 52, 128)])], { join: "word" });
+    expect(q.stem).toBe("알코올 농도 범위는?");
+    const [c] = splitPages([page([t("1. 알코올 농도", 40, 100), t("범위는?", 52, 114), t("① 가", 52, 128)])]);
+    expect(c.stem).toBe("알코올 농도범위는?"); // default stays 글자 단위
+  });
 });
 
 describe("parseAnswerKey", () => {

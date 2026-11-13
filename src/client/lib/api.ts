@@ -44,6 +44,7 @@ export type Subject = { id: number; name: string; sortOrder: number };
 export type QuestionStatus = "review" | "active" | "disabled";
 export type QuestionListItem = {
   id: number;
+  groupKey: string | null;
   code: number;
   version: number;
   subjectId: number;
@@ -80,3 +81,41 @@ export type SourceFile = {
   status: "uploaded" | "reviewing" | "done" | "failed";
   createdAt: number;
 };
+
+export type ExamSettings = {
+  title: string;
+  timeLimitMin: number;
+  opensAt: number | null;
+  closesAt: number | null;
+  passSubjectPct: number;
+  passAvgPct: number;
+  shuffleQuestions: boolean;
+  shuffleWithinSubject: boolean;
+  shuffleChoices: boolean;
+  revealExplanations: boolean;
+  notice: string;
+};
+export type ExamStatus = "draft" | "open" | "closed";
+export type ExamListItem = {
+  id: number;
+  title: string;
+  code: string;
+  status: ExamStatus;
+  opensAt: number | null;
+  closesAt: number | null;
+  timeLimitMin: number;
+  questionCount: number;
+  attemptCount: number;
+};
+export type ExamQuestion = {
+  eqId: number;
+  questionId: number;
+  code: number;
+  version: number;
+  subjectId: number;
+  subjectName: string;
+  stemPreview: string;
+  groupKey: string | null;
+  points: number;
+};
+export type ExamDetail = ExamSettings & { id: number; code: string; status: ExamStatus; locked: boolean; attemptCount: number; questions: ExamQuestion[] };

@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorMessage, type SourceFile, type Subject } from "@/lib/api";
 import { blankDraft, mergeWithNext, refKey, splitAt, stemPicture, toBulkItem, toReview, type ReviewDraft } from "../../../shared/draft-ops";
-import { applyAnswerKey, parseAnswerKey, splitPages, type Box, type ImageRef } from "../../../shared/split-rules";
+import { applyAnswerKey, DEFAULT_JOIN, parseAnswerKey, splitPages, type Box, type ImageRef, type JoinMode } from "../../../shared/split-rules";
 import { selectClass } from "../question-bank/common";
 import { cropToPng, CROP_SCALE, extractPages, loadPdf, renderPage, uploadMedia } from "./pdf";
 
 const MARKS = "①②③④⑤⑥⑦⑧";
-type Saved = { drafts: ReviewDraft[]; keys: Record<string, string> };
+type Saved = { drafts: ReviewDraft[]; keys: Record<string, string>; join?: JoinMode };
 const storageKey = (id: number) => `tatq-import-${id}`;
 
 export function ReviewPage() {
@@ -20,6 +20,7 @@ export function ReviewPage() {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [drafts, setDrafts] = useState<ReviewDraft[]>([]);
   const [keys, setKeys] = useState<Record<string, string>>({}); // picture → uploaded R2 key
+  const [join, setJoin] = useState<JoinMode>(DEFAULT_JOIN); // how wrapped lines are joined, per paper
   const [sel, setSel] = useState(0);
   const [pageNo, setPageNo] = useState(1);
   const [crop, setCrop] = useState<Box | null>(null); // dragged area waiting for a target
@@ -40,7 +41,7 @@ export function ReviewPage() {
     [doc],
   );
 
-  const autoSplit = async (d: PDFDocumentProxy, subs: Subject[]) => toReview(splitPages(await extractPages(d)), subs);
+  const autoSplit = async (d: PDFDocumentProxy, subs: Subject[], mode: JoinMode) => toReview(splitPages(await extractPages(d), { join: mode }), subs);
 
   useEffect(() => {
     let alive = true;
@@ -55,8 +56,9 @@ export function ReviewPage() {
           const v = JSON.parse(saved) as Saved;
           setDrafts(v.drafts);
           setKeys(v.keys);
+          setJoin(v.join ?? DEFAULT_JOIN);
         } else {
-          const list = await autoSplit(d, subs.items);
+          const list = await autoSplit(d, subs.items, DEFAULT_JOIN);
           if (!alive) return;
           setDrafts(list);
           if (list.length === 0) setNotice("글자를 읽을 수 없는 PDF입니다(스캔본). '문항 추가' 후 원본에서 영역을 드래그해 그림으로 잘라 주세요.");
@@ -72,20 +74,25 @@ export function ReviewPage() {
 
   // Review work lives in this browser until it is registered.
   useEffect(() => {
-    if (doc) localStorage.setItem(storageKey(id), JSON.stringify({ drafts, keys } satisfies Saved));
-  }, [id, doc, drafts, keys]);
+    if (doc) localStorage.setItem(storageKey(id), JSON.stringify({ drafts, keys, join } satisfies Saved));
+  }, [id, doc, drafts, keys, join]);
 
   const cur = drafts[sel] as ReviewDraft | undefined;
   const update = (i: number, patch: Partial<ReviewDraft>) => setDrafts((list) => list.map((d, k) => (k === i ? { ...d, ...patch } : d)));
+  // Selecting a card turns the original to the page that question is on.
   const select = (i: number) => {
     setSel(i);
-    if (drafts[i]?.box.w) setPageNo(drafts[i].page);
+    if (drafts[i]) setPageNo(drafts[i].page);
   };
 
-  const resplit = async () => {
-    if (!doc || !confirm("자동 분리를 다시 하면 지금까지 고친 내용이 사라집니다. 계속할까요?")) return;
-    setDrafts(await autoSplit(doc, subjects));
+  const resplit = async (mode = join) => {
+    if (!doc || !confirm("자동 분리를 다시 하면 지금까지 고친 내용이 사라집니다. 계속할까요?")) return false;
+    setDrafts(await autoSplit(doc, subjects, mode));
     setSel(0);
+    return true;
+  };
+  const changeJoin = async (mode: JoinMode) => {
+    if (await resplit(mode)) setJoin(mode);
   };
 
   const applyKey = () => {
@@ -160,7 +167,14 @@ export function ReviewPage() {
           문항 {drafts.length} · 정답 {answered} · 검수 완료 {reviewedCount}
         </span>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="outline" onClick={resplit}>
+          <label className="flex items-center gap-1 text-sm" title="줄이 바뀐 곳을 이어 붙이는 방식. 바꾸면 자동 분리를 다시 합니다.">
+            줄바꿈
+            <select aria-label="줄바꿈 이어 붙이기" className={`${selectClass} h-8`} value={join} onChange={(e) => changeJoin(e.target.value as JoinMode)}>
+              <option value="char">글자 단위 (붙여 씀)</option>
+              <option value="word">어절 단위 (띄어 씀)</option>
+            </select>
+          </label>
+          <Button size="sm" variant="outline" onClick={() => resplit()}>
             자동 분리 다시
           </Button>
           <Button size="sm" onClick={register} disabled={busy || reviewedCount === 0}>
@@ -294,6 +308,13 @@ function PageView(props: {
     };
   }, [doc, pageNo]);
 
+  // Bring the selected question's area into view once its page is drawn.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const selectedId = draft?.id;
+  useEffect(() => {
+    overlayRef.current?.querySelector("[data-selected]")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedId, pageNo, size]);
+
   // Pointer position in PDF points.
   const at = (e: React.PointerEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -310,6 +331,7 @@ function PageView(props: {
     <div className="relative overflow-hidden rounded border bg-white shadow-sm">
       <canvas ref={canvasRef} className="block h-auto w-full" />
       <div
+        ref={overlayRef}
         className="absolute inset-0 cursor-crosshair touch-none"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -339,6 +361,7 @@ function PageView(props: {
               key={d.id}
               className={`absolute rounded-sm border ${d === draft ? "border-2 border-blue-600 bg-blue-500/10" : d.reviewed ? "border-emerald-500/60" : "border-slate-400/40"}`}
               style={pct(d.box)}
+              data-selected={d === draft || undefined}
             />
           ))}
         {pictures.map((r) => (

@@ -23,6 +23,9 @@ export function AdminLayout() {
           <NavLink to="/admin/questions" className={navClass}>
             문제은행
           </NavLink>
+          <NavLink to="/admin/exams" className={navClass}>
+            시험
+          </NavLink>
           <NavLink to="/admin/import" className={navClass}>
             PDF 가져오기
           </NavLink>

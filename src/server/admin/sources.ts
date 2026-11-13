@@ -38,7 +38,7 @@ export const sourceRoutes = new Hono<AppEnv>()
     const roundLabel = typeof body.roundLabel === "string" ? body.roundLabel.trim().slice(0, 50) || null : null;
     const kind = body.kind === "scan" ? "scan" : body.kind === "text" ? "text" : null;
     const key = `sources/${crypto.randomUUID()}.pdf`;
-    await c.env.FILES.put(key, file.stream(), { httpMetadata: { contentType: "application/pdf" } });
+    await c.env.FILES.put(key, file, { httpMetadata: { contentType: "application/pdf" } });
 
     const db = getDb(c.env);
     try {
@@ -85,7 +85,7 @@ export const mediaRoutes = new Hono<AppEnv>()
     const ext = (await startsWith(file, PNG_SIG)) ? "png" : (await startsWith(file, JPEG_SIG)) ? "jpg" : null;
     if (!ext) return fail(c, 400, "not_image", "PNG 또는 JPEG 이미지만 올릴 수 있습니다.");
     const key = `media/${crypto.randomUUID()}.${ext}`;
-    await c.env.FILES.put(key, file.stream(), { httpMetadata: { contentType: ext === "png" ? "image/png" : "image/jpeg" } });
+    await c.env.FILES.put(key, file, { httpMetadata: { contentType: ext === "png" ? "image/png" : "image/jpeg" } });
     return c.json({ key }, 201);
   })
 

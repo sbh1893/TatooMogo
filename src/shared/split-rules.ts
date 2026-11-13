@@ -50,16 +50,22 @@ type Block = { kind: "line"; line: Line } | { kind: "image"; page: number; box: 
 const isHangul = (ch: string | undefined) => !!ch && /[가-힣]/.test(ch);
 
 /**
- * Joins a wrapped line onto the text before it. Korean wraps between any two syllables, so a
- * Hangul–Hangul break is usually mid-word: join without a space. Elsewhere a space is likely.
- * ponytail: a break that fell on a real space between two Hangul words loses that space; the
- * reviewer fixes it on the review screen.
+ * How a line that wrapped is joined back onto the text before it.
+ * - "char" (글자 단위): the paper wraps between any two syllables (Korean default, CSS word-break: normal),
+ *   so a Hangul–Hangul break is taken as mid-word and joined without a space.
+ *   ponytail: a break that fell on a real space between two Hangul words loses that space; the reviewer fixes it.
+ * - "word" (어절 단위): the paper only wraps at spaces (word-break: keep-all), so every break is a space.
  */
-export function joinWrapped(a: string, b: string) {
+export type JoinMode = "char" | "word";
+export type SplitOptions = { join?: JoinMode };
+export const DEFAULT_JOIN: JoinMode = "char";
+
+export function joinWrapped(a: string, b: string, mode: JoinMode = DEFAULT_JOIN) {
   if (!a) return b;
   if (!b) return a;
   // "것" (a bound noun) is always written after a space in Korean.
-  return isHangul(a.at(-1)) && isHangul(b[0]) && b[0] !== "것" ? a + b : `${a} ${b}`;
+  const glue = mode === "char" && isHangul(a.at(-1)) && isHangul(b[0]) && b[0] !== "것";
+  return glue ? a + b : `${a} ${b}`;
 }
 
 function toLines(page: number, items: TextItem[]): Line[] {
@@ -142,7 +148,8 @@ const union = (a: Box, b: Box): Box => {
 };
 const lineBox = (l: Line): Box => ({ x: l.x, y: l.y - l.h, w: l.right - l.x, h: l.h * 1.3 });
 
-export function splitPages(pages: PageData[]): Draft[] {
+export function splitPages(pages: PageData[], opts: SplitOptions = {}): Draft[] {
+  const join = (a: string, b: string) => joinWrapped(a, b, opts.join ?? DEFAULT_JOIN);
   const drafts: Draft[] = [];
   let subject: string | null = null;
   let cur: Draft | null = null;
@@ -184,8 +191,8 @@ export function splitPages(pages: PageData[]): Draft[] {
       const head = (at === -1 ? rest : rest.slice(0, at)).trim();
       if (head) {
         const last = q.choices.at(-1);
-        if (last) last.text = joinWrapped(last.text, head);
-        else q.stem = joinWrapped(q.stem, head);
+        if (last) last.text = join(last.text, head);
+        else q.stem = join(q.stem, head);
       }
       if (at === -1) break;
       // Estimate where the marker sits, for attaching image choices.
@@ -247,7 +254,7 @@ export function splitPages(pages: PageData[]): Draft[] {
         addText(cur, { ...line, text: qm[2] });
         continue;
       }
-      if (inIntro && group) group.intro = joinWrapped(group.intro, line.text);
+      if (inIntro && group) group.intro = join(group.intro, line.text);
       else if (cur) addText(cur, line);
       // Anything before the first question (cover, notices) is not part of any question.
     }

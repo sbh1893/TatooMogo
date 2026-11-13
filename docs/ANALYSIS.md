@@ -430,19 +430,19 @@ type LayoutItem = {
 - [x] 보고
 
 ### 3주차 — 응시·채점
-- [ ] `shared/prng.ts`(cyrb128, sfc32), `shared/paper.ts`, `shared/grade.ts` + 단위 테스트(5-6)
-- [ ] 시험 API: 생성(코드 발급), 설정 수정 제한, 문항 구성(attempt 생기면 잠금), 열기·닫기
-- [ ] 시험 개설 화면: 설정 폼, 과목 필터 문항 선택, 배점, 코드 복사
-- [ ] `/api/exam/info`, `/enter`(seed·세션 발급, 이어서 응시, 마지막 기기 우선, 이름 불일치 거절)
-- [ ] 첫 attempt 때 `exams.layout` 생성·잠금 + isolate 메모리 캐시(5-3)
-- [ ] `/paper`(정답 없는 응답), `/answers`(layout + 보기 1행 조회로 역변환 저장), `/submit`, `/result`(공개 설정 반영), `/media/:key`
-- [ ] lazy finalize + Cron Trigger, 마감 유예 5초
-- [ ] 응시 화면 React 이식: 상단바, 도구줄, 1단·2단, 글자 크기, 답안 표기란, 모바일 하단 패널, 제출·시간 종료 모달, 단축키, 저장 실패 재시도 표시
-- [ ] 결과 화면 이식(해설 필터, 공통 문항 번호)
-- [ ] 보안 테스트: 응시 중 응답 JSON에 금지 키·값 없음, 다른 attempt 세션으로 접근 불가, 마감 뒤 저장 거절
-- [ ] Playwright: 수험자 2명 → 서로 다른 문제지 → 정해진 답 제출 → 기대 점수 일치
-- [ ] 390px 확인
-- [ ] 보고
+- [x] `shared/prng.ts`(cyrb128, sfc32), `shared/paper.ts`, `shared/grade.ts` + 단위 테스트(5-6)
+- [x] 시험 API: 생성(코드 발급), 설정 수정 제한, 문항 구성(attempt 생기면 잠금), 열기·닫기
+- [x] 시험 개설 화면: 설정 폼, 과목 필터 문항 선택, 배점, 코드 복사
+- [x] `/api/exam/info`, `/enter`(seed·세션 발급, 이어서 응시, 마지막 기기 우선, 이름 불일치 거절)
+- [x] 첫 attempt 때 `exams.layout` 생성·잠금 + isolate 메모리 캐시(5-3)
+- [x] `/paper`(정답 없는 응답), `/answers`(layout + 보기 1행 조회로 역변환 저장), `/submit`, `/result`(공개 설정 반영), `/media/:key`
+- [x] lazy finalize + Cron Trigger, 마감 유예 5초
+- [x] 응시 화면 React 이식: 상단바, 도구줄, 1단·2단, 글자 크기, 답안 표기란, 모바일 하단 패널, 제출·시간 종료 모달, 단축키, 저장 실패 재시도 표시
+- [x] 결과 화면 이식(해설 필터, 공통 문항 번호)
+- [x] 보안 테스트: 응시 중 응답 JSON에 금지 키·값 없음, 다른 attempt 세션으로 접근 불가, 마감 뒤 저장 거절
+- [x] Playwright: 수험자 2명 → 서로 다른 문제지 → 정해진 답 제출 → 기대 점수 일치
+- [x] 390px 확인
+- [x] 보고
 
 ### 4주차 — 오픈 준비
 - [ ] 응시 현황 API·화면(인원, 진행률, 마지막 활동, 기기 전환)

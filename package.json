@@ -19,7 +19,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:seed:local": "tsx scripts/seed.ts",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
-    "split:measure": "tsx scripts/measure-split.ts"
+    "split:measure": "tsx scripts/measure-split.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
@@ -38,6 +39,7 @@
     "@cloudflare/vite-plugin": "^1.69.1",
     "@cloudflare/vitest-pool-workers": "^0.23.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",

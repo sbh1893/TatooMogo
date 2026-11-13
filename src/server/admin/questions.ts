@@ -50,6 +50,8 @@ export const questionRoutes = new Hono<AppEnv>()
     const db = getDb(c.env);
     const q = c.req.query();
     const page = Math.max(1, Number.parseInt(q.page ?? "1", 10) || 1);
+    // The exam question picker asks for everything at once (?size=500).
+    const size = Math.min(500, Math.max(1, Number.parseInt(q.size ?? String(PAGE_SIZE), 10) || PAGE_SIZE));
     const conds = [eq(questions.isLatest, true)];
     if (q.subject) conds.push(eq(questions.subjectId, Number(q.subject)));
     if (q.status && STATUSES.includes(q.status as QuestionStatus)) {
@@ -70,6 +72,7 @@ export const questionRoutes = new Hono<AppEnv>()
           version: questions.version,
           subjectId: questions.subjectId,
           subjectName: subjects.name,
+          groupKey: questions.groupKey,
           stemPreview: sql<string>`substr(${questions.stem}, 1, 80)`,
           status: questions.status,
           updatedAt: questions.updatedAt,
@@ -79,11 +82,11 @@ export const questionRoutes = new Hono<AppEnv>()
         .innerJoin(subjects, eq(subjects.id, questions.subjectId))
         .where(where)
         .orderBy(desc(questions.code))
-        .limit(PAGE_SIZE)
-        .offset((page - 1) * PAGE_SIZE),
+        .limit(size)
+        .offset((page - 1) * size),
       db.select({ total: count() }).from(questions).where(where),
     ]);
-    return c.json({ items, total, page, pageSize: PAGE_SIZE });
+    return c.json({ items, total, page, pageSize: size });
   })
 
   .get("/:id{[0-9]+}", async (c) => {
