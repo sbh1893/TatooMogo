@@ -132,8 +132,7 @@
 .cbt .qpane.two .q+.q{border-left:0;border-top:1px dashed var(--line);margin-top:20px;padding-top:20px}
 .cbt .omr{position:fixed;left:0;right:0;bottom:0;width:auto;margin:0;max-height:62vh;border-radius:12px 12px 0 0;z-index:30;transform:translateY(100%);transition:transform .25s;box-shadow:0 -10px 30px rgba(0,0,0,.2)}
 .cbt .omr.open{transform:none}
-.cbt .omr-toggle{display:flex;position:fixed;right:12px;bottom:12px;z-index:31;background:var(--navy);color:#fff;border:0;border-radius:24px;padding:12px 18px;font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);gap:6px}
-.cbt .omr.open + .omr-toggle{bottom:calc(62vh + 10px)}
+.cbt .omr-toggle{display:inline-flex;align-items:center;gap:4px;background:var(--navy);color:#fff;border:0;border-radius:3px;padding:6px 10px;font-weight:700;font-size:13px}
 .cbt .subj{grid-template-columns:1fr 70px}
 .cbt .subj .bar{grid-column:1/-1;order:3}
 .cbt .stamp{width:90px;height:90px;font-size:22px}

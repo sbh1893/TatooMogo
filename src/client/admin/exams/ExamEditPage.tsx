@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router";
+import type { Me } from "../AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,7 @@ export function ExamEditRoute() {
 function ExamEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const me = useOutletContext<Me>();
   const [exam, setExam] = useState<ExamDetail | null>(null);
   const [form, setForm] = useState<ExamSettings>(defaults);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +110,7 @@ function ExamEditPage() {
                 {exam.code}
               </button>
             </span>
-            {exam.status !== "open" ? (
+            {exam.status === "deleting" ? null : exam.status !== "open" ? (
               <Button size="sm" onClick={() => setStatus("open")}>
                 시험 열기
               </Button>
@@ -117,6 +119,12 @@ function ExamEditPage() {
                 시험 닫기
               </Button>
             )}
+            <Button size="sm" variant="outline" asChild>
+              <Link to={`/admin/exams/${exam.id}/monitor`}>응시 현황</Link>
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <Link to={`/admin/exams/${exam.id}/results`}>성적</Link>
+            </Button>
           </>
         )}
       </div>
@@ -182,7 +190,71 @@ function ExamEditPage() {
         </div>
       </form>
 
-      {exam && <QuestionPicker exam={exam} onSaved={load} onError={setError} />}
+      {exam && exam.status !== "deleting" && <QuestionPicker exam={exam} onSaved={load} onError={setError} />}
+      {exam && me.role === "super_admin" && (exam.status === "closed" || exam.status === "deleting") && <DeleteExam exam={exam} />}
+    </section>
+  );
+}
+
+/**
+ * Super admin: deletes a closed exam and its attempts. The server works in steps (a few thousand
+ * answers per request), so this keeps calling until it reports done. Re-opening the page continues
+ * an interrupted delete.
+ */
+function DeleteExam({ exam }: { exam: ExamDetail }) {
+  const navigate = useNavigate();
+  const [typed, setTyped] = useState("");
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const resuming = exam.status === "deleting";
+  const ready = resuming || typed.trim().toUpperCase() === exam.code;
+
+  const run = async () => {
+    setError(null);
+    let removed = 0;
+    setProgress(0);
+    try {
+      for (;;) {
+        const r = await api<{ done: boolean; deletedAnswers: number }>(`/api/admin/exams/${exam.id}/delete`, { method: "POST" });
+        removed += r.deletedAnswers;
+        setProgress(removed);
+        if (r.done) break;
+      }
+      alert(`「${exam.title}」 시험을 삭제했습니다.`);
+      navigate("/admin/exams", { replace: true });
+    } catch (e) {
+      setError(`${errorMessage(e)} 다시 누르면 이어서 지웁니다.`);
+      setProgress(null);
+    }
+  };
+
+  return (
+    <section className="space-y-3 rounded-lg border border-red-200 bg-white p-4">
+      <h2 className="font-bold text-red-800">시험 삭제 (최고관리자)</h2>
+      <p className="text-sm text-slate-700">
+        시험, 문항 구성, 응시 기록({exam.attemptCount}명)과 답안이 모두 지워지고 되돌릴 수 없습니다. 문항은 문제은행에 남습니다.
+      </p>
+      <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        삭제하기 전에{" "}
+        <Link to={`/admin/exams/${exam.id}/results`} className="font-bold underline">
+          성적 화면에서 엑셀을 내려받아
+        </Link>{" "}
+        보관해 주세요. 삭제 후에는 성적을 다시 볼 수 없습니다.
+      </p>
+      {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+      {resuming ? (
+        <p className="text-sm text-red-800">삭제가 중간에 멈춘 시험입니다. 아래 버튼으로 이어서 지웁니다.</p>
+      ) : (
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-code">
+            확인을 위해 시험 코드 <b className="font-mono">{exam.code}</b>를 입력하세요
+          </Label>
+          <Input id="confirm-code" className="max-w-40 font-mono uppercase" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </div>
+      )}
+      <Button variant="destructive" disabled={!ready || progress !== null} onClick={run}>
+        {progress !== null ? `지우는 중… (답안 ${progress}개)` : resuming ? "이어서 삭제" : "시험 삭제"}
+      </Button>
     </section>
   );
 }

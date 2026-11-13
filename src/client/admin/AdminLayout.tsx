@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router";
 import { api, errorMessage } from "@/lib/api";
 
-type Me = { email: string; role: "admin" | "super_admin" };
+export type Me = { email: string; role: "admin" | "super_admin" };
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded px-3 py-1.5 text-sm ${isActive ? "bg-white/20 font-bold" : "hover:bg-white/10"}`;
@@ -19,7 +19,7 @@ export function AdminLayout() {
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <header className="flex flex-wrap items-center gap-2 bg-[#1f3a5f] px-4 py-2 text-white">
         <span className="mr-2 font-black">CBT 관리자</span>
-        <nav className="flex gap-1">
+        <nav className="flex flex-wrap gap-1">
           <NavLink to="/admin/questions" className={navClass}>
             문제은행
           </NavLink>
@@ -29,6 +29,17 @@ export function AdminLayout() {
           <NavLink to="/admin/import" className={navClass}>
             PDF 가져오기
           </NavLink>
+          {/* Shown to super admins only; the server checks the role on every request anyway. */}
+          {me?.role === "super_admin" && (
+            <>
+              <NavLink to="/admin/admins" className={navClass}>
+                관리자
+              </NavLink>
+              <NavLink to="/admin/audit-logs" className={navClass}>
+                접속 기록
+              </NavLink>
+            </>
+          )}
         </nav>
         <span className="ml-auto truncate text-xs opacity-80">
           {me ? `${me.email} · ${me.role === "super_admin" ? "최고관리자" : "관리자"}` : ""}
@@ -38,7 +49,7 @@ export function AdminLayout() {
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-800">{error}</div>
         ) : me ? (
-          <Outlet />
+          <Outlet context={me} />
         ) : (
           <p className="p-6 text-slate-500">불러오는 중…</p>
         )}

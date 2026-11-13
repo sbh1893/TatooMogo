@@ -45,6 +45,47 @@ export function QuestionListPage() {
     }
   };
 
+  /** The server decides: delete if no attempt used it, else move it to the archive (rule 8). */
+  const remove = async (item: QuestionListItem) => {
+    const what = item.used
+      ? `#${item.code} 문항은 응시 기록이 있어 완전히 지울 수 없습니다. 보관함으로 옮길까요? (과거 성적·해설은 그대로 남습니다)`
+      : `#${item.code} 문항을 삭제할까요? 모든 버전과 이 문항만 쓰는 그림이 지워지고 되돌릴 수 없습니다.`;
+    if (!confirm(what)) return;
+    try {
+      const r = await api<{ result: "deleted" | "archived" }>(`/api/admin/questions/${item.id}`, { method: "DELETE" });
+      alert(r.result === "deleted" ? `#${item.code} 문항을 삭제했습니다.` : `#${item.code} 문항을 보관함으로 옮겼습니다.`);
+      load();
+    } catch (e) {
+      alert(errorMessage(e));
+    }
+  };
+  const restore = async (item: QuestionListItem) => {
+    try {
+      await api(`/api/admin/questions/${item.id}/restore`, { method: "POST" });
+      load();
+    } catch (e) {
+      alert(errorMessage(e));
+    }
+  };
+  const actions = (item: QuestionListItem) =>
+    item.status === "archived" ? (
+      <Button size="sm" variant="outline" onClick={() => restore(item)}>
+        복원
+      </Button>
+    ) : (
+      <>
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/admin/questions/${item.id}`}>수정</Link>
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => toggle(item)}>
+          {item.status === "disabled" ? "재사용" : "중지"}
+        </Button>
+        <Button size="sm" variant="ghost" className="text-red-700" onClick={() => remove(item)}>
+          삭제
+        </Button>
+      </>
+    );
+
   const lastPage = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
 
   return (
@@ -82,10 +123,11 @@ export function QuestionListPage() {
           value={params.get("status") ?? ""}
           onChange={(e) => setFilter("status", e.target.value as QuestionStatus | "")}
         >
-          <option value="">전체 상태</option>
+          <option value="">전체 상태 (보관 제외)</option>
           <option value="active">사용</option>
           <option value="disabled">사용 중지</option>
           <option value="review">검수 대기</option>
+          <option value="archived">보관함</option>
         </select>
         <Input
           className="min-w-0 flex-1 basis-48"
@@ -122,14 +164,7 @@ export function QuestionListPage() {
                 응시 기록 있음
               </Badge>
             )}
-            <div className="mt-2 flex justify-end gap-1">
-              <Button asChild size="sm" variant="outline">
-                <Link to={`/admin/questions/${item.id}`}>수정</Link>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => toggle(item)}>
-                {item.status === "disabled" ? "재사용" : "중지"}
-              </Button>
-            </div>
+            <div className="mt-2 flex justify-end gap-1">{actions(item)}</div>
           </li>
         ))}
         {data && data.items.length === 0 && (
@@ -169,14 +204,7 @@ export function QuestionListPage() {
                 <TableCell>
                   <StatusBadge status={item.status} />
                 </TableCell>
-                <TableCell className="space-x-1 text-right whitespace-nowrap">
-                  <Button asChild size="sm" variant="outline">
-                    <Link to={`/admin/questions/${item.id}`}>수정</Link>
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => toggle(item)}>
-                    {item.status === "disabled" ? "재사용" : "중지"}
-                  </Button>
-                </TableCell>
+                <TableCell className="space-x-1 text-right whitespace-nowrap">{actions(item)}</TableCell>
               </TableRow>
             ))}
             {data && data.items.length === 0 && (

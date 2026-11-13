@@ -24,7 +24,8 @@ const paperOf = (att: Attempt, exam: Exam, layout: NonNullable<Awaited<ReturnTyp
 async function examByCode(db: Db, raw: unknown) {
   const code = typeof raw === "string" ? raw.trim().toUpperCase() : "";
   if (!/^[A-Z0-9]{6}$/.test(code)) return null;
-  return (await db.select().from(exams).where(eq(exams.code, code)).get()) ?? null;
+  const exam = await db.select().from(exams).where(eq(exams.code, code)).get();
+  return exam && exam.status !== "deleting" ? exam : null; // being deleted = already gone for examinees
 }
 
 /** Issues a fresh session for this device; any earlier device stops working (last device wins). */

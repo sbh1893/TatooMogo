@@ -13,6 +13,10 @@ Thumbs.db
 # Copyrighted exam papers must never be committed.
 docs/samples/*.pdf
 docs/samples/*.txt
+# The client's original plan (private) and DB dumps (examinee names) stay out of this public repo.
+docs/reference/*.pdf
+/*.sql
+backup-*.sql
 
 # ---- GitHub Node template (from initial commit) ----
 # Logs

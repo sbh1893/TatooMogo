@@ -12,3 +12,5 @@ ADMIN_DEV_EMAIL=dev@example.com
 # Production only (set with `wrangler secret put`, see docs/SETUP.md):
 # ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
 # ACCESS_AUD=<Application Audience (AUD) tag>
+# SENTRY_DSN=<Sentry project DSN>       (Worker errors; optional)
+# Browser errors: VITE_SENTRY_DSN in the build environment (.env.production.local or CI), optional.

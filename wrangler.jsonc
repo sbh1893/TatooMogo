@@ -29,6 +29,12 @@
       "bucket_name": "tatto-cbt-files"
     }
   ],
+  // Per-IP request limits (per Cloudflare location, approximate). One academy behind one IP may be
+  // 30–100 examinees, so the limits are per crowd, not per person. namespace_id: unique per account.
+  "ratelimits": [
+    { "name": "RL_API", "namespace_id": "1001", "simple": { "limit": 1200, "period": 60 } },
+    { "name": "RL_ENTRY", "namespace_id": "1002", "simple": { "limit": 200, "period": 60 } }
+  ],
   // Closes exam attempts whose time ran out while the examinee was offline (free Cron Trigger).
   "triggers": { "crons": ["*/10 * * * *"] },
   "observability": {

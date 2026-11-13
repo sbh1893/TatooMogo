@@ -11,6 +11,10 @@ export type Bindings = {
   ADMIN_DEV_EMAIL?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
+  SENTRY_DSN?: string;
+  /** Workers Rate Limiting bindings (wrangler.jsonc "ratelimits"). Missing = no limit. */
+  RL_API?: RateLimit;
+  RL_ENTRY?: RateLimit;
 };
 
 export type AppEnv = {
@@ -40,7 +44,7 @@ export function rawBatch(env: Bindings, items: Built[]) {
   );
 }
 
-export function fail(c: Context, status: 400 | 401 | 403 | 404 | 409 | 500, code: string, message: string) {
+export function fail(c: Context, status: 400 | 401 | 403 | 404 | 409 | 429 | 500, code: string, message: string) {
   return c.json({ error: { code, message } }, status);
 }
 

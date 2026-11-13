@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { QuestionStatus } from "@/lib/api";
 
-const LABEL: Record<QuestionStatus, string> = { active: "사용", disabled: "사용 중지", review: "검수 대기" };
+const LABEL: Record<QuestionStatus, string> = { active: "사용", disabled: "사용 중지", review: "검수 대기", archived: "보관" };
 
 export function StatusBadge({ status }: { status: QuestionStatus }) {
   return <Badge variant={status === "active" ? "default" : status === "disabled" ? "secondary" : "outline"}>{LABEL[status]}</Badge>;

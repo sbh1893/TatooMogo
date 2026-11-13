@@ -68,6 +68,10 @@ export async function ensureLayout(db: Db, examId: number): Promise<LayoutItem[]
 export const subjectOrderOf = (layout: LayoutItem[]) =>
   [...new Map(layout.map((l) => [l.subjectId, l.subjectOrder]))].sort((a, b) => a[1] - b[1]).map(([id]) => id);
 
+/** Drops this isolate's copy after an exam is deleted (other isolates keep theirs; exam ids are never reused). */
+/** No id: forget all (tests reset the database, so ids start over). */
+export const forgetLayout = (examId?: number) => (examId === undefined ? layoutCache.clear() : layoutCache.delete(examId));
+
 // ------------------------------------------------------------------ sessions
 
 const hex = (buf: ArrayBuffer | Uint8Array) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");

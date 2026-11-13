@@ -20,7 +20,8 @@ export type QuestionInput = {
   choices: ChoiceInput[];
 };
 
-export type QuestionStatus = "review" | "active" | "disabled";
+/** "archived": deleted by an admin but kept because attempts used it (rule 8). */
+export type QuestionStatus = "review" | "active" | "disabled" | "archived";
 
 type Result = { ok: true; value: QuestionInput } | { ok: false; errors: string[] };
 

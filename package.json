@@ -20,10 +20,13 @@
     "db:seed:local": "tsx scripts/seed.ts",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "split:measure": "tsx scripts/measure-split.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "load-test": "tsx scripts/load-test.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
+    "@sentry/browser": "^11.12.0",
+    "@sentry/cloudflare": "^11.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",

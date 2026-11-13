@@ -69,7 +69,7 @@ export const questions = sqliteTable(
     explanation: text().notNull().default(""),
     fixedChoices: bool("fixed_choices").notNull().default(false),
     groupKey: text("group_key"),
-    status: text({ enum: ["review", "active", "disabled"] }).notNull(),
+    status: text({ enum: ["review", "active", "disabled", "archived"] }).notNull(),
     createdBy: integer("created_by").references(() => admins.id),
     createdAt: integer("created_at").notNull().$default(() => Date.now()),
     updatedAt: integer("updated_at").notNull().$default(() => Date.now()),
@@ -101,7 +101,8 @@ export const exams = sqliteTable("exams", {
   id: integer().primaryKey(),
   title: text().notNull(),
   code: text().notNull().unique(),
-  status: text({ enum: ["draft", "open", "closed"] }).notNull().default("draft"),
+  // "deleting": a super admin started deleting it (chunked); nothing may reopen it.
+  status: text({ enum: ["draft", "open", "closed", "deleting"] }).notNull().default("draft"),
   timeLimitMin: integer("time_limit_min").notNull(),
   opensAt: integer("opens_at"),
   closesAt: integer("closes_at"),

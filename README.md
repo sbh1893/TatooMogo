@@ -8,7 +8,8 @@
 | `docs/PLAN.md` | 기획서 개발용 요약본 |
 | `docs/ANALYSIS.md` | 설계 (API, 화면, 스키마, 셔플·채점, 가정) |
 | `docs/PROMPTS.md` | 단계별 작업 지시문 |
-| `docs/SETUP.md` | Cloudflare 설정 절차 (사람이 하는 일) |
+| `docs/SETUP.md` | Cloudflare 설정·배포·백업·되돌리기 절차 (사람이 하는 일) |
+| `docs/OPERATIONS.md` | 시험일 체크리스트 |
 | `docs/reference/` | 화면·셔플 데모, 원본 기획서 |
 | `docs/samples/` | 실제 문제지 PDF 샘플 (git 제외) |
 
@@ -53,8 +54,9 @@ Node.js 20 이상이 필요합니다. 아래 명령은 PowerShell과 macOS/Linux
 | `npm run db:migrate:local` / `db:migrate:remote` | 로컬 / 운영 D1에 마이그레이션 적용 |
 | `npm run db:seed:local` | 로컬 데모 데이터 |
 | `npm run db:bootstrap-admin -- <이메일> --remote` | 최초 최고관리자 등록 |
-| `npm run test:e2e` | Playwright: 수험자 2명 응시·채점 (로컬 개발 서버, 처음 한 번 `npx playwright install chromium`) |
+| `npm run test:e2e` | Playwright: 수험자 2명 응시·채점, 390px 긴 문항 버튼 (로컬 개발 서버, 처음 한 번 `npx playwright install chromium`) |
 | `npm run split:measure` | 테스트 문제지(`docs/samples/test`)로 PDF 자동 분리 정확도 측정 |
+| `npm run load-test` | 부하 점검: 30명 동시 입장·답안 저장·제출, 요청 수와 D1 읽기·쓰기 출력 (`npm run dev` 켠 상태에서, `-- --n 50` 등) |
 
 ## 직접 해야 하는 일
 

@@ -270,6 +270,10 @@ export function ExamPage() {
             ) : null}
             전체 <b>{n}</b> · 안 푼 문제 <b style={{ color: "var(--bad)" }}>{unanswered.length}</b>
           </div>
+          {/* Mobile only. Lives in the toolbar, not floating, so it never covers the 다음/제출 buttons. */}
+          <button className="omr-toggle" onClick={() => setOmrOpen(!omrOpen)} aria-expanded={omrOpen}>
+            📝 답안 표기란
+          </button>
         </div>
         {Object.keys(unsaved).length > 0 && (
           <div className="savebar" role="alert">
@@ -359,9 +363,6 @@ export function ExamPage() {
               </button>
             </div>
           </aside>
-          <button className="omr-toggle" onClick={() => setOmrOpen(!omrOpen)} aria-expanded={omrOpen}>
-            📝 답안 표기란
-          </button>
         </div>
       </section>
 

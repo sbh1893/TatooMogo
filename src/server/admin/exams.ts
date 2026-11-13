@@ -1,8 +1,25 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { attempts, examQuestions, exams, questions, subjects } from "../../db/schema";
-import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv } from "../env";
-import { auditInsert } from "./audit";
+import type { SubjectScore } from "../../shared/grade";
+import { superAdminOnly } from "../auth/middleware";
+import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv, type Db } from "../env";
+import { forgetLayout } from "../exam/attempt";
+import { auditInsert, auditInsertIf } from "./audit";
+
+/**
+ * Answers removed per delete request. A 100-person, 100-question exam has 10,000 answers,
+ * so about 5 requests. Each deleted row also writes its index entries (D1 free: 100k rows written/day).
+ */
+// Swappable in tests so the multi-step path runs with a handful of answers.
+export const examDeleteDeps = { chunk: 2000 };
+
+/**
+ * SQLite would hand a deleted exam's id (if it was the largest) to the next exam, and isolates cache
+ * layouts by exam id with no invalidation. So new ids also skip every id in the deletion log.
+ */
+const nextExamId = sql`(select max(coalesce((select max(id) from exams), 0),
+  coalesce((select max(cast(target_id as integer)) from audit_logs where action = 'exam.delete'), 0)) + 1)`;
 
 /** 6 characters without look-alikes (0/O, 1/I/L), case-insensitive (ANALYSIS #23). */
 const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -79,6 +96,60 @@ function parseSettings(raw: unknown, partial: boolean): { ok: true; value: Parti
 
 const attemptCount = sql<number>`(select count(*) from attempts a where a.exam_id = ${exams.id})`;
 
+/** Scores per examinee and the correct rate per common question number (submitted attempts only). */
+async function loadResults(db: Db, id: number) {
+  const [[exam], people, perQuestion, subj] = await Promise.all([
+    db
+      .select({ id: exams.id, title: exams.title, code: exams.code, passSubjectPct: exams.passSubjectPct, passAvgPct: exams.passAvgPct })
+      .from(exams)
+      .where(eq(exams.id, id)),
+    db
+      .select({
+        no: attempts.examineeNo,
+        name: attempts.examineeName,
+        startedAt: attempts.startedAt,
+        submittedAt: attempts.submittedAt,
+        submitReason: attempts.submitReason,
+        totalCorrect: attempts.totalCorrect,
+        avgPct: attempts.avgPct,
+        passed: attempts.passed,
+        subjectScores: attempts.subjectScores,
+      })
+      .from(attempts)
+      .where(and(eq(attempts.examId, id), isNotNull(attempts.submittedAt)))
+      .orderBy(asc(attempts.examineeNo)),
+    db.all<{ code: number; version: number; subject: string; correct: number; answered: number }>(sql`
+      select q.code as code, q.version as version, s.name as subject,
+        count(case when c.is_correct = 1 then 1 end) as correct, count(c.id) as answered
+      from exam_questions eq join questions q on q.id = eq.question_id join subjects s on s.id = q.subject_id
+      left join answers an on an.exam_question_id = eq.id
+        and an.attempt_id in (select id from attempts where exam_id = ${id} and submitted_at is not null)
+      left join choices c on c.id = an.choice_id
+      where eq.exam_id = ${id} group by eq.id order by eq.position`),
+    db.select({ id: subjects.id, name: subjects.name }).from(subjects),
+  ]);
+  if (!exam) return null;
+  const subjectName = new Map(subj.map((s) => [s.id, s.name]));
+  const n = people.length;
+  return {
+    exam,
+    submitted: n,
+    examinees: people.map(({ subjectScores, avgPct, passed, ...p }) => ({
+      ...p,
+      avgPct: (avgPct ?? 0) / 100,
+      passed: !!passed,
+      subjects: ((subjectScores ?? []) as SubjectScore[]).map((s) => ({
+        name: subjectName.get(s.subjectId) ?? "",
+        correct: s.correct,
+        total: s.total,
+        pct: s.possible ? Math.round((1000 * s.earned) / s.possible) / 10 : 0,
+      })),
+    })),
+    // Unanswered counts as wrong: the rate is over everyone who submitted.
+    questions: perQuestion.map((q) => ({ ...q, rate: n ? Math.round((1000 * q.correct) / n) / 10 : null })),
+  };
+}
+
 export const examRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
     const rows = await getDb(c.env)
@@ -110,7 +181,7 @@ export const examRoutes = new Hono<AppEnv>()
         const [[row]] = await db.batch([
           db
             .insert(exams)
-            .values({ ...(v.value as Settings), code, createdBy: c.get("admin").id })
+            .values({ ...(v.value as Settings), id: nextExamId, code, createdBy: c.get("admin").id })
             .returning(),
           auditInsert(db, c, "exam.create", { type: "exam", id: sql`(select cast(max(id) as text) from exams)` }, { title: v.value.title, code }),
         ]);
@@ -210,12 +281,100 @@ export const examRoutes = new Hono<AppEnv>()
     return c.json({ id, count: items.length });
   })
 
+  /** Live status: who is sitting, how far along, last activity, device switches. */
+  .get("/:id{[0-9]+}/attempts", async (c) => {
+    const db = getDb(c.env);
+    const id = Number(c.req.param("id"));
+    const [[exam], items] = await Promise.all([
+      db
+        .select({ id: exams.id, title: exams.title, code: exams.code, status: exams.status, total: sql<number>`(select count(*) from exam_questions where exam_id = ${id})` })
+        .from(exams)
+        .where(eq(exams.id, id)),
+      db.all<{
+        no: string;
+        name: string;
+        startedAt: number;
+        deadlineAt: number;
+        submittedAt: number | null;
+        submitReason: string | null;
+        deviceSwitches: number;
+        lastActiveAt: number;
+        answered: number;
+      }>(sql`select a.examinee_no as no, a.examinee_name as name, a.started_at as startedAt, a.deadline_at as deadlineAt,
+          a.submitted_at as submittedAt, a.submit_reason as submitReason, a.device_switches as deviceSwitches,
+          max(coalesce(a.last_seen_at, 0), coalesce((select max(saved_at) from answers x where x.attempt_id = a.id), 0)) as lastActiveAt,
+          (select count(*) from answers x where x.attempt_id = a.id and x.choice_id is not null) as answered
+        from attempts a where a.exam_id = ${id} order by a.examinee_no`),
+    ]);
+    if (!exam) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
+    const submitted = items.filter((i) => i.submittedAt !== null).length;
+    return c.json({ exam, serverNow: Date.now(), inProgress: items.length - submitted, submitted, items });
+  })
+
+  .get("/:id{[0-9]+}/results", async (c) => {
+    const r = await loadResults(getDb(c.env), Number(c.req.param("id")));
+    return r ? c.json(r) : fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
+  })
+
+  /** Same data for the xlsx file (built in the browser: CPU limit), but the download is logged. */
+  .post("/:id{[0-9]+}/export", async (c) => {
+    const db = getDb(c.env);
+    const id = Number(c.req.param("id"));
+    const r = await loadResults(db, id);
+    if (!r) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
+    await auditInsert(db, c, "exam.export", { type: "exam", id: String(id) }, { examinees: r.submitted });
+    return c.json(r);
+  })
+
+  /**
+   * Deletes a closed exam with its composition, attempts and answers (questions stay). Super admin only.
+   * Runs in steps so no single request does a long D1 write: the first call marks the exam "deleting"
+   * (from then on it can't be reopened or entered) and logs it; each call removes up to examDeleteDeps.chunk
+   * answers; the last removes the rest. The browser calls again while `done` is false.
+   */
+  .post("/:id{[0-9]+}/delete", superAdminOnly, async (c) => {
+    const db = getDb(c.env);
+    const id = Number(c.req.param("id"));
+    const exam = await db.select({ status: exams.status, title: exams.title, code: exams.code }).from(exams).where(eq(exams.id, id)).get();
+    if (!exam) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
+    if (exam.status === "open" || exam.status === "draft") return fail(c, 409, "not_closed", "닫힌 시험만 삭제할 수 있습니다.");
+
+    if (exam.status === "closed") {
+      const pending = sql`exists(select 1 from attempts where exam_id = ${id} and submitted_at is null)`;
+      const [{ n }] = await db.select({ n: count() }).from(attempts).where(eq(attempts.examId, id));
+      const [mark] = await rawBatch(c.env, [
+        sql`update exams set status = 'deleting' where id = ${id} and status = 'closed' and not ${pending}`,
+        auditInsertIf(c, sql`(select status from exams where id = ${id}) = 'deleting'`, "exam.delete", { type: "exam", id: String(id) }, {
+          title: exam.title,
+          code: exam.code,
+          attempts: n,
+        }),
+      ]);
+      if (!mark.meta.changes) {
+        return fail(c, 409, "in_progress", "아직 제출되지 않은 응시가 있습니다. 시간이 끝난 응시는 10분 안에 자동 제출되니 잠시 뒤 다시 시도해 주세요.");
+      }
+    }
+
+    const del = await db.run(sql`delete from answers where rowid in (
+      select an.rowid from answers an join attempts a on a.id = an.attempt_id where a.exam_id = ${id} limit ${examDeleteDeps.chunk})`);
+    if (del.meta.changes >= examDeleteDeps.chunk) return c.json({ done: false, deletedAnswers: del.meta.changes });
+    await rawBatch(c.env, [
+      sql`delete from answers where attempt_id in (select id from attempts where exam_id = ${id})`, // stragglers, normally none
+      db.delete(attempts).where(eq(attempts.examId, id)),
+      db.delete(examQuestions).where(eq(examQuestions.examId, id)),
+      db.delete(exams).where(and(eq(exams.id, id), eq(exams.status, "deleting"))),
+    ]);
+    forgetLayout(id);
+    return c.json({ done: true, deletedAnswers: del.meta.changes });
+  })
+
   .post("/:id{[0-9]+}/:action{open|close}", async (c) => {
     const db = getDb(c.env);
     const id = Number(c.req.param("id"));
     const action = c.req.param("action") as "open" | "close";
-    const exam = await db.select({ id: exams.id }).from(exams).where(eq(exams.id, id)).get();
+    const exam = await db.select({ id: exams.id, status: exams.status }).from(exams).where(eq(exams.id, id)).get();
     if (!exam) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
+    if (exam.status === "deleting") return fail(c, 409, "deleting", "삭제 중인 시험입니다.");
     if (action === "open") {
       const [{ n }] = await db.select({ n: count() }).from(examQuestions).where(eq(examQuestions.examId, id));
       if (n === 0) return fail(c, 400, "empty", "문항을 하나 이상 넣은 뒤 열 수 있습니다.");

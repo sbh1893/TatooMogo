@@ -34,6 +34,12 @@ const DAY = 86_400_000;
 const KST = 9 * 3_600_000;
 const startOfKstDay = (t: number) => Math.floor((t + KST) / DAY) * DAY - KST;
 
+/** For routes mounted under requireAdmin(): the admin row is already loaded, only the role is checked. */
+export const superAdminOnly = createMiddleware<AppEnv>(async (c, next) => {
+  if (c.get("admin").role !== "super_admin") return fail(c, 403, "forbidden", "최고관리자만 사용할 수 있습니다.");
+  await next();
+});
+
 /** Runs on every /api/admin request: who are you, are you still allowed, is your role enough. */
 export const requireAdmin = (role: Admin["role"] = "admin") =>
   createMiddleware<AppEnv>(async (c, next) => {

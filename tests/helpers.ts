@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { app } from "../src/server";
 import { authDeps } from "../src/server/auth/middleware";
+import { forgetLayout } from "../src/server/exam/attempt";
 import type { Bindings } from "../src/server/env";
 
 export const DEV_EMAIL = "dev@test.kr";
@@ -28,6 +29,7 @@ export function call(path: string, init: RequestInit & { json?: unknown } = {}, 
 }
 
 export async function resetDb() {
+  forgetLayout(); // ids restart after the reset; a cached layout from an earlier test must not leak in
   await env.DB.batch(
     ["answers", "attempts", "exam_questions", "exams", "choices", "questions", "source_files", "subjects", "audit_logs", "admins"].map(
       (t) => env.DB.prepare(`DELETE FROM ${t}`),

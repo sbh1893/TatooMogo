@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { api, errorMessage } from "@/lib/api";
 import "./cbt.css";
+import { LegalLinks } from "./LegalPage";
 import type { ExamInfo } from "./types";
 
 const fmt = (t: number | null) => (t ? new Date(t).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" }) : "");
@@ -149,7 +150,13 @@ export function HomePage() {
               </p>
               <label className="agree">
                 <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required />
-                <span>시험 진행과 성적 처리를 위해 이름과 수험번호를 저장하는 데 동의합니다.</span>
+                <span>
+                  시험 진행과 성적 처리를 위해 이름과 수험번호를 저장하는 데 동의합니다. (
+                  <a href="/privacy" target="_blank" rel="noreferrer">
+                    개인정보 처리방침
+                  </a>
+                  )
+                </span>
               </label>
               <button className="btn btn-primary btn-block" disabled={busy || !agree}>
                 {busy ? "입장 중…" : "시험 시작"}
@@ -162,6 +169,7 @@ export function HomePage() {
             </form>
           )}
         </div>
+        <LegalLinks />
       </div>
     </div>
   );

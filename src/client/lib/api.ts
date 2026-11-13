@@ -41,7 +41,7 @@ export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : "ì
 
 // Response shapes of /api/admin (kept next to the fetcher; the server is the source of truth).
 export type Subject = { id: number; name: string; sortOrder: number };
-export type QuestionStatus = "review" | "active" | "disabled";
+export type QuestionStatus = "review" | "active" | "disabled" | "archived";
 export type QuestionListItem = {
   id: number;
   groupKey: string | null;
@@ -95,7 +95,7 @@ export type ExamSettings = {
   revealExplanations: boolean;
   notice: string;
 };
-export type ExamStatus = "draft" | "open" | "closed";
+export type ExamStatus = "draft" | "open" | "closed" | "deleting";
 export type ExamListItem = {
   id: number;
   title: string;
@@ -118,4 +118,50 @@ export type ExamQuestion = {
   groupKey: string | null;
   points: number;
 };
-export type ExamDetail = ExamSettings & { id: number; code: string; status: ExamStatus; locked: boolean; attemptCount: number; questions: ExamQuestion[] };
+export type ExamMonitor = {
+  exam: { id: number; title: string; code: string; status: ExamStatus; total: number };
+  serverNow: number;
+  inProgress: number;
+  submitted: number;
+  items: {
+    no: string;
+    name: string;
+    startedAt: number;
+    deadlineAt: number;
+    submittedAt: number | null;
+    submitReason: "manual" | "timeout" | "admin" | null;
+    deviceSwitches: number;
+    lastActiveAt: number;
+    answered: number;
+  }[];
+};
+export type ExamResults = {
+  exam: { id: number; title: string; code: string; passSubjectPct: number; passAvgPct: number };
+  submitted: number;
+  examinees: {
+    no: string;
+    name: string;
+    startedAt: number;
+    submittedAt: number;
+    submitReason: "manual" | "timeout" | "admin" | null;
+    totalCorrect: number;
+    avgPct: number;
+    passed: boolean;
+    subjects: { name: string; correct: number; total: number; pct: number }[];
+  }[];
+  questions: { code: number; version: number; subject: string; correct: number; answered: number; rate: number | null }[];
+};
+export type AdminRole = "admin" | "super_admin";
+export type AdminRow = { id: number; email: string; role: AdminRole; status: "active" | "suspended"; createdAt: number; lastLoginAt: number | null };
+export type AuditLog = {
+  id: number;
+  adminId: number | null;
+  adminEmail: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  detail: unknown;
+  ip: string | null;
+  createdAt: number;
+};
+export type ExamDetail =ExamSettings & { id: number; code: string; status: ExamStatus; locked: boolean; attemptCount: number; questions: ExamQuestion[] };

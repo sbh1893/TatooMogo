@@ -12,12 +12,19 @@ export type AuditAction =
   | "question.disable"
   | "question.enable"
   | "question.import"
+  | "question.delete"
+  | "question.archive"
+  | "question.restore"
   | "source.upload"
   | "exam.create"
   | "exam.update"
   | "exam.questions"
   | "exam.open"
-  | "exam.close";
+  | "exam.close"
+  | "exam.export"
+  | "exam.delete"
+  | "admin.create"
+  | "admin.update";
 
 /**
  * Builds (does not run) an audit insert so callers can put it in the same D1 batch

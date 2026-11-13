@@ -4,6 +4,7 @@ const LABEL: Record<ExamStatus, [string, string]> = {
   draft: ["준비 중", "bg-slate-100 text-slate-700"],
   open: ["열림", "bg-emerald-100 text-emerald-900"],
   closed: ["닫힘", "bg-slate-300 text-slate-800"],
+  deleting: ["삭제 중", "bg-red-100 text-red-800"],
 };
 
 export function ExamStatusBadge({ status }: { status: ExamStatus }) {

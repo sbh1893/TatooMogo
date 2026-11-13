@@ -71,6 +71,62 @@ async function sit(page: Page, answerRight: (subject: string) => boolean) {
   return order;
 }
 
+test("390px: 다음/답안 제출 stay clickable on long questions", async ({ browser, request }) => {
+  const { items: subjects } = await admin<{ items: { id: number }[] }>(request, "GET", "/api/admin/subjects");
+  const longStem = Array.from({ length: 30 }, (_, k) => `긴 지문 ${run} 줄 ${k + 1}`).join("\n");
+  const ids: number[] = [];
+  for (let n = 1; n <= 2; n++) {
+    const q = await admin<{ id: number }>(request, "POST", "/api/admin/questions", {
+      subjectId: subjects[0].id,
+      stem: `${longStem}\n문항 ${n}`,
+      fixedChoices: false,
+      choices: [0, 1, 2, 3].map((k) => ({ body: `보기 ${k}`, isCorrect: k === 0 })),
+    });
+    ids.push(q.id);
+  }
+  const exam = await admin<{ id: number; code: string }>(request, "POST", "/api/admin/exams", { title: `E2E mobile ${run}`, timeLimitMin: 30, passSubjectPct: 40, passAvgPct: 60 });
+  await admin(request, "PUT", `/api/admin/exams/${exam.id}/questions`, { items: ids.map((questionId) => ({ questionId })) });
+  await admin(request, "POST", `/api/admin/exams/${exam.id}/open`);
+
+  const page = await (await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })).newPage();
+  await enter(page, exam.code, `M${run}`.slice(0, 16), "모바일");
+  // A plain click fails if anything (e.g. a floating button) sits on top of the target.
+  const next = page.getByRole("button", { name: "다음 ▶" });
+  await next.scrollIntoViewIfNeeded();
+  await next.click({ timeout: 3000 });
+  await expect(page.locator(".navrow .pos")).toHaveText("2 / 2");
+  const submit = page.locator(".navrow").getByRole("button", { name: "답안 제출" });
+  await submit.scrollIntoViewIfNeeded();
+  await submit.click({ timeout: 3000 });
+  await expect(page.locator(".modal")).toBeVisible();
+  // The answer sheet still opens from the toolbar.
+  await page.locator(".modal").getByRole("button", { name: "계속 풀기" }).click();
+  await page.getByRole("button", { name: "📝 답안 표기란" }).click();
+  await expect(page.locator(".omr.open")).toBeVisible();
+});
+
+test("exam delete stays disabled until the exam code is typed", async ({ page, request }) => {
+  const exam = await admin<{ id: number; code: string }>(request, "POST", "/api/admin/exams", {
+    title: `E2E 삭제 ${run}`,
+    timeLimitMin: 30,
+    passSubjectPct: 40,
+    passAvgPct: 60,
+  });
+  await admin(request, "POST", `/api/admin/exams/${exam.id}/close`);
+  await page.goto(`/admin/exams/${exam.id}`);
+  const button = page.getByRole("button", { name: "시험 삭제" });
+  await expect(button).toBeDisabled();
+  const input = page.getByLabel(/시험 코드/);
+  await input.fill("WRONG1");
+  await expect(button).toBeDisabled();
+  await input.fill(exam.code.toLowerCase()); // case does not matter
+  await expect(button).toBeEnabled();
+  page.once("dialog", (d) => d.accept());
+  await button.click();
+  await expect(page).toHaveURL(/\/admin\/exams$/);
+  expect((await request.get(`/api/admin/exams/${exam.id}`)).status()).toBe(404);
+});
+
 test("two examinees get different papers and the scores match their answers", async ({ browser, request }) => {
   const { code, firstSubject } = await makeExam(request);
   const a = await (await browser.newContext()).newPage();

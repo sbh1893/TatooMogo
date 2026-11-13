@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { choices, questions, sourceFiles, subjects } from "../../db/schema";
 import { validateQuestionInput, type QuestionInput, type QuestionStatus } from "../../shared/question";
@@ -6,7 +6,17 @@ import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv, type Db } from "
 import { auditInsert, auditInsertIf } from "./audit";
 
 const PAGE_SIZE = 20;
-const STATUSES: QuestionStatus[] = ["review", "active", "disabled"];
+const STATUSES: QuestionStatus[] = ["review", "active", "disabled", "archived"];
+
+/** Any version of this common number is in an exam that is open right now. */
+const inOpenExamSql = (code: number) =>
+  sql`exists(select 1 from exam_questions eq join exams e on e.id = eq.exam_id join questions q on q.id = eq.question_id
+    where q.code = ${code} and e.status = 'open')`;
+/** Rule 8 over every version of this common number. */
+const codeUsedSql = (code: number) =>
+  sql`exists(select 1 from exam_questions eq join attempts a on a.exam_id = eq.exam_id join questions q on q.id = eq.question_id
+    where q.code = ${code})`;
+const versionIds = (code: number) => sql`(select id from questions where code = ${code})`;
 
 // In a D1 batch (one transaction, single writer) the row just inserted has the highest id.
 const lastQuestionId = sql`(select max(id) from questions)`;
@@ -56,6 +66,8 @@ export const questionRoutes = new Hono<AppEnv>()
     if (q.subject) conds.push(eq(questions.subjectId, Number(q.subject)));
     if (q.status && STATUSES.includes(q.status as QuestionStatus)) {
       conds.push(eq(questions.status, q.status as QuestionStatus));
+    } else {
+      conds.push(ne(questions.status, "archived")); // the archive is its own filter (보관함)
     }
     const term = q.q?.trim();
     if (term) {
@@ -208,6 +220,7 @@ export const questionRoutes = new Hono<AppEnv>()
     const cur = await db.select().from(questions).where(eq(questions.id, id)).get();
     if (!cur) return fail(c, 404, "not_found", "문항을 찾을 수 없습니다.");
     if (!cur.isLatest) return fail(c, 409, "not_latest", "최신 버전만 수정할 수 있습니다.");
+    if (cur.status === "archived") return fail(c, 409, "archived", "보관된 문항입니다. 복원한 뒤 수정해 주세요.");
     const parsed = await readInput(c, db);
     if (!parsed.ok) return fail(c, 400, "invalid", parsed.errors.join("\n"));
     const input = parsed.value;
@@ -261,13 +274,70 @@ export const questionRoutes = new Hono<AppEnv>()
     }
   })
 
-  .post("/:id{[0-9]+}/:action{disable|enable}", async (c) => {
+  /**
+   * Deletes a question (every version of its common number).
+   * - in an open exam: refused, with the exam titles
+   * - used by attempts (rule 8): archived instead; past results and reviews keep reading the rows
+   * - otherwise: removed from any draft/closed exam composition and deleted, with pictures no other question uses
+   * Both conditions are re-checked inside the batch, so an exam opening or an attempt starting in between wins.
+   */
+  .delete("/:id{[0-9]+}", async (c) => {
+    const db = getDb(c.env);
+    const cur = await db.select({ code: questions.code }).from(questions).where(eq(questions.id, Number(c.req.param("id")))).get();
+    if (!cur) return fail(c, 404, "not_found", "문항을 찾을 수 없습니다.");
+    const { code } = cur;
+    const inOpen = inOpenExamSql(code);
+    const used = codeUsedSql(code);
+    const refuseOpen = async () => {
+      const open = await db.all<{ title: string }>(sql`select distinct e.title as title from exam_questions eq join exams e on e.id = eq.exam_id
+        join questions q on q.id = eq.question_id where q.code = ${code} and e.status = 'open'`);
+      return fail(c, 409, "in_open_exam", `열려 있는 시험에 들어 있어 삭제할 수 없습니다: ${open.map((o) => o.title).join(", ")}. 시험을 닫은 뒤 다시 시도해 주세요.`);
+    };
+    const state = await db.get<{ open: number; used: number }>(sql`select ${inOpen} as open, ${used} as used`);
+    if (state?.open) return refuseOpen();
+
+    if (state?.used) {
+      const [upd] = await rawBatch(c.env, [
+        sql`update questions set status = 'archived', updated_at = ${Date.now()} where code = ${code} and is_latest = 1 and not ${inOpen}`,
+        auditInsertIf(c, sql`not ${inOpen}`, "question.archive", { type: "question", id: String(code) }, { code }),
+      ]);
+      if (!upd.meta.changes) return refuseOpen();
+      return c.json({ code, result: "archived" });
+    }
+
+    const images = await db.all<{ key: string }>(sql`select stem_image_key as key from questions where code = ${code} and stem_image_key is not null
+      union select image_key from choices where question_id in ${versionIds(code)} and image_key is not null`);
+    const ok = sql`not ${inOpen} and not ${used}`;
+    const res = await rawBatch(c.env, [
+      sql`delete from exam_questions where question_id in ${versionIds(code)} and ${ok}`,
+      sql`delete from choices where question_id in ${versionIds(code)} and ${ok}`,
+      sql`delete from questions where code = ${code} and ${ok}`,
+      auditInsertIf(c, sql`not exists(select 1 from questions where code = ${code})`, "question.delete", { type: "question", id: String(code) }, { code, images: images.length }),
+    ]);
+    if (!res[2].meta.changes) {
+      const again = await db.get<{ open: number }>(sql`select ${inOpen} as open`);
+      return again?.open ? refuseOpen() : fail(c, 409, "conflict", "방금 응시가 시작되었습니다. 다시 시도하면 보관함으로 옮겨집니다.");
+    }
+    // Pictures no remaining question points to. A failure here only leaves an unreachable object behind.
+    if (images.length) {
+      const keys = JSON.stringify(images.map((i) => i.key));
+      const orphans = await db.all<{ key: string }>(sql`select value as key from json_each(${keys}) k
+        where not exists(select 1 from questions where stem_image_key = k.value) and not exists(select 1 from choices where image_key = k.value)`);
+      if (orphans.length) await c.env.FILES.delete(orphans.map((o) => o.key)).catch((e) => console.error("R2 delete failed", e));
+    }
+    return c.json({ code, result: "deleted" });
+  })
+
+  .post("/:id{[0-9]+}/:action{disable|enable|restore}", async (c) => {
     const db = getDb(c.env);
     const id = Number(c.req.param("id"));
-    const action = c.req.param("action") as "disable" | "enable";
+    const action = c.req.param("action") as "disable" | "enable" | "restore";
     const cur = await db.select().from(questions).where(eq(questions.id, id)).get();
     if (!cur) return fail(c, 404, "not_found", "문항을 찾을 수 없습니다.");
     if (!cur.isLatest) return fail(c, 409, "not_latest", "최신 버전만 바꿀 수 있습니다.");
+    if ((action === "restore") !== (cur.status === "archived")) {
+      return fail(c, 409, "archived", action === "restore" ? "보관된 문항이 아닙니다." : "보관된 문항입니다. 먼저 복원해 주세요.");
+    }
     const status = action === "disable" ? "disabled" : "active";
     await db.batch([
       db.update(questions).set({ status, updatedAt: Date.now() }).where(eq(questions.id, id)),
