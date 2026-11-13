@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, errorMessage, type QuestionListItem, type QuestionStatus, type Subject } from "@/lib/api";
+import { DIFFICULTIES, KNOWLEDGE_LEVELS } from "../../../shared/question";
 import { StatusBadge, selectClass } from "./common";
 
 type ListResponse = { items: QuestionListItem[]; total: number; page: number; pageSize: number };
@@ -12,6 +13,7 @@ type ListResponse = { items: QuestionListItem[]; total: number; page: number; pa
 export function QuestionListPage() {
   const [params, setParams] = useSearchParams();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [fields, setFields] = useState<string[]>([]);
   const [data, setData] = useState<ListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [term, setTerm] = useState(params.get("q") ?? "");
@@ -19,6 +21,7 @@ export function QuestionListPage() {
 
   useEffect(() => {
     api<{ items: Subject[] }>("/api/admin/subjects").then((r) => setSubjects(r.items), (e) => setError(errorMessage(e)));
+    api<{ fields: string[] }>("/api/admin/docx/fields").then((r) => setFields(r.fields), () => {});
   }, []);
 
   const load = useCallback(() => {
@@ -129,6 +132,27 @@ export function QuestionListPage() {
           <option value="review">검수 대기</option>
           <option value="archived">보관함</option>
         </select>
+        {/* Word-import metadata (admin only). */}
+        <select aria-label="분야" className={selectClass} value={params.get("field") ?? ""} onChange={(e) => setFilter("field", e.target.value)}>
+          <option value="">전체 분야</option>
+          {fields.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <select aria-label="지식수준" className={selectClass} value={params.get("knowledge") ?? ""} onChange={(e) => setFilter("knowledge", e.target.value)}>
+          <option value="">전체 지식수준</option>
+          {KNOWLEDGE_LEVELS.map((k) => (
+            <option key={k}>{k}</option>
+          ))}
+        </select>
+        <select aria-label="예상 난이도" className={selectClass} value={params.get("difficulty") ?? ""} onChange={(e) => setFilter("difficulty", e.target.value)}>
+          <option value="">전체 난이도</option>
+          {DIFFICULTIES.map((d) => (
+            <option key={d}>{d}</option>
+          ))}
+        </select>
         <Input
           className="min-w-0 flex-1 basis-48"
           placeholder="지문 검색 또는 공통 문항 번호"
@@ -159,6 +183,7 @@ export function QuestionListPage() {
             <Link to={`/admin/questions/${item.id}`} className="mt-1 line-clamp-3 text-sm hover:underline">
               {item.stemPreview}
             </Link>
+            <Meta item={item} />
             {item.used && (
               <Badge variant="outline" className="mt-1">
                 응시 기록 있음
@@ -195,6 +220,7 @@ export function QuestionListPage() {
                   <Link to={`/admin/questions/${item.id}`} className="line-clamp-2 hover:underline">
                     {item.stemPreview}
                   </Link>
+                  <Meta item={item} />
                   {item.used && (
                     <Badge variant="outline" className="mt-1">
                       응시 기록 있음
@@ -241,4 +267,9 @@ export function QuestionListPage() {
       )}
     </section>
   );
+}
+
+function Meta({ item }: { item: QuestionListItem }) {
+  const parts = [item.field, item.knowledgeLevel, item.difficulty && `난이도 ${item.difficulty}`].filter(Boolean);
+  return parts.length ? <p className="mt-0.5 text-xs text-slate-500">{parts.join(" · ")}</p> : null;
 }

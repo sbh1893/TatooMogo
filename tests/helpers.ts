@@ -31,7 +31,7 @@ export function call(path: string, init: RequestInit & { json?: unknown } = {}, 
 export async function resetDb() {
   forgetLayout(); // ids restart after the reset; a cached layout from an earlier test must not leak in
   await env.DB.batch(
-    ["answers", "attempts", "exam_questions", "exams", "choices", "questions", "source_files", "subjects", "audit_logs", "admins"].map(
+    ["answers", "attempts", "exam_questions", "exams", "choices", "questions", "source_files", "field_subjects", "subjects", "audit_logs", "admins"].map(
       (t) => env.DB.prepare(`DELETE FROM ${t}`),
     ),
   );

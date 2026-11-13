@@ -36,7 +36,7 @@ function toSheets(r: ExamResults) {
     },
     {
       name: "문항별 정답률",
-      rows: [["공통 문항 번호", "버전", "과목", "정답 수", "응답 수", "제출 인원", "정답률(%)"], ...r.questions.map((q) => [q.code, q.version, q.subject, q.correct, q.answered, r.submitted, q.rate])],
+      rows: [["공통 문항 번호", "버전", "과목", "정답 수", "응답 수", "제출 인원", "정답률(%)", "예상 난이도"], ...r.questions.map((q) => [q.code, q.version, q.subject, q.correct, q.answered, r.submitted, q.rate, q.difficulty ?? ""])],
     },
   ];
 }
@@ -131,6 +131,9 @@ export function ExamResultsPage() {
                   <th className="p-2">공통 번호</th>
                   <th className="p-2">과목</th>
                   <th className="p-2">정답률</th>
+                  <th className="p-2" title="문항개발 문서의 예상 난이도 (실제 정답률과 비교)">
+                    예상 난이도
+                  </th>
                   <th className="p-2 text-right">정답/제출</th>
                 </tr>
               </thead>
@@ -154,6 +157,7 @@ export function ExamResultsPage() {
                         </div>
                       )}
                     </td>
+                    <td className="p-2 text-xs">{q.difficulty ?? "-"}</td>
                     <td className="p-2 text-right text-xs">
                       {q.correct}/{data.submitted}
                     </td>

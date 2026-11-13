@@ -65,6 +65,9 @@
 | DELETE | `/api/admin/questions/:id` | — | 공통 번호의 모든 버전: 응시에 쓰였으면 `archived`(보관), 아니면 삭제 + 이 문항만 쓰는 R2 그림 삭제. 열린 시험에 있으면 409 → `{ result: "deleted" \| "archived" }` | admin |
 | POST | `/api/admin/questions/:id/restore` | — | 보관 → 사용 | admin |
 | POST | `/api/admin/exams/:id/delete` | — | 닫힌 시험 삭제(문항 구성·응시·답안). 첫 호출에 `deleting`으로 바꾸고 감사 로그, 호출마다 답안 2,000개씩 → `{ done, deletedAnswers }`, `done`까지 반복 | super_admin |
+| GET/PUT | `/api/admin/docx/fields` | `{ map: [{ field, subjectId }] }` | Word 분야 → 과목 매핑 조회·저장, 문제은행에 있는 분야 목록 | admin |
+| POST | `/api/admin/docx/existing` | `{ keys: [{ criterionNo, itemNo }] }` | 이미 등록된 기준·문항 번호와 공통 번호 | admin |
+| POST | `/api/admin/docx/import` | `{ onDuplicate: 'skip' \| 'version', items: [{ ...문항, meta }] }` (요청당 50개) | Word 검수 결과 등록. 파일 원본은 받지 않는다. 고정 개수 문장 batch(json_each) → `{ created, versioned, skipped }` | admin |
 
 ---
 
@@ -152,6 +155,9 @@
 | created_at, updated_at | integer | |
 
 인덱스: unique `(code, version)`, `(is_latest, subject_id, status)`, `(source_file_id)`, `(group_key)`
+
+Word 가져오기 메타데이터(관리자 전용, 수험자 API에서 조회하지 않음): `dev_criterion_no`(문항개발기준 번호), `dev_item_no`(예비문항 번호), `dev_field`(분야), `knowledge_level`(암기형·해석형·문제해결형), `expected_difficulty`(하·중·중상·상), `dev_intent`, `dev_objection_review`, `dev_basis`. 새 버전은 이 값을 그대로 이어받는다. 인덱스 `(dev_criterion_no, dev_item_no)`, `(dev_field)`.
+`field_subjects(field PK, subject_id, updated_at)`: Word 분야 → 과목 매핑.
 
 ### choices
 | 컬럼 | 타입 | 비고 |

@@ -267,6 +267,29 @@ function QuestionEditPage() {
         </div>
       </fieldset>
 
+      {detail?.devCriterionNo && (
+        <details className="rounded-lg border bg-white p-4 text-sm">
+          <summary className="cursor-pointer font-bold">문항개발 정보 (관리자 전용, Word에서 가져옴)</summary>
+          <dl className="mt-2 grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1">
+            {(
+              [
+                ["기준·문항 번호", `${detail.devCriterionNo}-${detail.devItemNo}`],
+                ["분야", detail.devField],
+                ["지식수준", detail.knowledgeLevel],
+                ["예상 난이도", detail.expectedDifficulty],
+                ["출제의도", detail.devIntent],
+                ["이의제기 예방검토", detail.devObjectionReview],
+                ["근거번호", detail.devBasis],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-slate-500">{k}</dt>
+                <dd className="whitespace-pre-line">{v || "-"}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
       {detail && detail.versions.length > 1 && (
         <div className="rounded-lg border bg-white p-4 text-sm">
           <h2 className="mb-2 font-bold">버전 이력</h2>

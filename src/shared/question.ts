@@ -20,6 +20,23 @@ export type QuestionInput = {
   choices: ChoiceInput[];
 };
 
+// Admin-only metadata from the question development documents (Word import). Never sent to examinees.
+export const KNOWLEDGE_LEVELS = ["암기형", "해석형", "문제해결형"] as const;
+export const DIFFICULTIES = ["하", "중", "중상", "상"] as const;
+export type KnowledgeLevel = (typeof KNOWLEDGE_LEVELS)[number];
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+export type QuestionMeta = {
+  criterionNo: string; // 문항개발기준 번호, as written ("012")
+  itemNo: number; // 예비문항 번호 within the criterion
+  field: string; // 분야
+  knowledgeLevel: KnowledgeLevel | null;
+  difficulty: Difficulty | null;
+  intent: string; // 출제의도
+  objectionReview: string; // 이의제기 예방검토
+  basis: string; // 근거번호
+};
+
 /** "archived": deleted by an admin but kept because attempts used it (rule 8). */
 export type QuestionStatus = "review" | "active" | "disabled" | "archived";
 
@@ -79,4 +96,39 @@ export function validateQuestionInput(raw: unknown): Result {
       choices,
     },
   };
+}
+
+/** Server-side check of the Word import metadata. Values outside the lists become null on the screen first. */
+export function validateQuestionMeta(raw: unknown): { ok: true; value: QuestionMeta } | { ok: false; errors: string[] } {
+  if (!isObj(raw)) return { ok: false, errors: ["메타데이터 형식이 올바르지 않습니다."] };
+  const errors: string[] = [];
+  const criterionNo = str(raw.criterionNo);
+  const itemNo = Number(raw.itemNo);
+  const field = str(raw.field);
+  if (!/^\d{1,10}$/.test(criterionNo)) errors.push("문항개발기준 번호가 없습니다.");
+  if (!Number.isInteger(itemNo) || itemNo <= 0) errors.push("예비문항 번호가 없습니다.");
+  if (!field || field.length > 50) errors.push("분야는 1~50자여야 합니다.");
+  const pick = <T extends string>(v: unknown, list: readonly T[], label: string) => {
+    const s = str(v);
+    if (s && !list.includes(s as T)) errors.push(`${label} 값이 목록에 없습니다: ${s}`);
+    return s ? (s as T) : null;
+  };
+  const knowledgeLevel = pick(raw.knowledgeLevel, KNOWLEDGE_LEVELS, "지식수준");
+  const difficulty = pick(raw.difficulty, DIFFICULTIES, "예상 난이도");
+  const text = (v: unknown, label: string) => {
+    const s = str(v);
+    if (s.length > MAX_TEXT) errors.push(`${label}은(는) ${MAX_TEXT}자 이하여야 합니다.`);
+    return s;
+  };
+  const value = {
+    criterionNo,
+    itemNo,
+    field,
+    knowledgeLevel,
+    difficulty,
+    intent: text(raw.intent, "출제의도"),
+    objectionReview: text(raw.objectionReview, "이의제기 예방검토"),
+    basis: text(raw.basis, "근거번호"),
+  };
+  return errors.length ? { ok: false, errors } : { ok: true, value };
 }

@@ -4,6 +4,7 @@ import { csrf } from "hono/csrf";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { adminRoutes, auditLogRoutes } from "./admin/admins";
+import { docxRoutes } from "./admin/docx-import";
 import { questionRoutes } from "./admin/questions";
 import { examRoutes } from "./admin/exams";
 import { mediaRoutes, sourceRoutes } from "./admin/sources";
@@ -38,6 +39,7 @@ const admin = new Hono<AppEnv>()
   })
   .route("/subjects", subjectRoutes)
   .route("/questions", questionRoutes)
+  .route("/docx", docxRoutes)
   .route("/source-files", sourceRoutes)
   .route("/media", mediaRoutes)
   .route("/exams", examRoutes)

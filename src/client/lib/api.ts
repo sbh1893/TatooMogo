@@ -53,6 +53,9 @@ export type QuestionListItem = {
   status: QuestionStatus;
   updatedAt: number;
   used: boolean;
+  field: string | null;
+  knowledgeLevel: string | null;
+  difficulty: string | null;
 };
 export type QuestionDetail = {
   id: number;
@@ -69,6 +72,15 @@ export type QuestionDetail = {
   used: boolean;
   choices: { id: number; ord: number; body: string; imageKey: string | null; isCorrect: boolean }[];
   versions: { id: number; version: number; status: QuestionStatus; createdAt: number }[];
+  // Word-import metadata (admin only)
+  devCriterionNo: string | null;
+  devItemNo: number | null;
+  devField: string | null;
+  knowledgeLevel: string | null;
+  expectedDifficulty: string | null;
+  devIntent: string | null;
+  devObjectionReview: string | null;
+  devBasis: string | null;
 };
 export type SaveResult = { id: number; code: number; version: number; newVersion: boolean };
 
@@ -153,7 +165,7 @@ export type ExamResults = {
     passed: boolean;
     subjects: { name: string; correct: number; total: number; pct: number }[];
   }[];
-  questions: { code: number; version: number; subject: string; correct: number; answered: number; rate: number | null }[];
+  questions: { code: number; version: number; subject: string; difficulty: string | null; correct: number; answered: number; rate: number | null }[];
 };
 export type AdminRole = "admin" | "super_admin";
 export type AdminRow = { id: number; email: string; role: AdminRole; status: "active" | "suspended"; createdAt: number; lastLoginAt: number | null };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { grade } from "../src/shared/grade";
-import { buildPaper, type LayoutItem, type PaperOptions } from "../src/shared/paper";
+import { buildPaper, renumberMarks, type LayoutItem, type PaperOptions } from "../src/shared/paper";
 import { paperCode } from "../src/shared/prng";
 
 /** 20 questions over 4 subjects (5 each), 5 choices; 3–4 are a group; 7 has fixed choices. */
@@ -105,5 +105,17 @@ describe("grade", () => {
       [1],
     );
     expect(r.avgPct).toBe(7500);
+  });
+});
+
+describe("renumberMarks: explanation marks follow the shuffled choices", () => {
+  it("maps each original mark to its screen number, all at once", () => {
+    // screen ① shows original ③, screen ② shows original ①, …
+    const order = [2, 0, 4, 1, 3];
+    expect(renumberMarks("③ 정답. ① 오답 / ② 오답 / ④ 오답 / ⑤ 오답", order)).toBe("① 정답. ② 오답 / ④ 오답 / ⑤ 오답 / ③ 오답");
+  });
+  it("leaves text alone when choices are not shuffled, and marks beyond the choices", () => {
+    expect(renumberMarks("② 맞음, ⑦ 기준", [0, 1, 2, 3, 4])).toBe("② 맞음, ⑦ 기준");
+    expect(renumberMarks("⑦ 기준", [4, 3, 2, 1, 0])).toBe("⑦ 기준");
   });
 });

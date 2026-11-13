@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { csrf } from "hono/csrf";
 import { attempts, exams } from "../../db/schema";
-import { buildPaper, type PaperItem } from "../../shared/paper";
+import { buildPaper, renumberMarks, type PaperItem } from "../../shared/paper";
 import { paperCode } from "../../shared/prng";
 import { fail, getDb, isUniqueViolation, type AppEnv, type Bindings, type Db } from "../env";
 import { ensureLayout, finalizeAttempt, getLayout, GRACE_MS, hashToken, newSecret, SESSION_COOKIE, type Attempt } from "./attempt";
@@ -276,7 +276,7 @@ export const examApi = new Hono<ExamEnv>()
           choices: choices.map((ch, m) => ({ no: m + 1, text: ch.body, image: mediaUrl(ch.img) })),
           correctNo: choices.findIndex((ch) => ch.correct) + 1,
           pickedNo: picked === undefined ? null : item.order.indexOf(picked) + 1,
-          explanation: q.explanation,
+          explanation: renumberMarks(q.explanation, item.order), // ①~⑤ follow this screen's choice order
         };
       });
     }

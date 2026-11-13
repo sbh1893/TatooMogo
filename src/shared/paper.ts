@@ -56,3 +56,18 @@ export function buildPaper(seed: string, opts: PaperOptions, layout: LayoutItem[
     return { eqId: item.eqId, questionId: item.questionId, order };
   });
 }
+
+const MARKS = "①②③④⑤⑥⑦⑧⑨⑩";
+
+/**
+ * Explanations are written against the original choice order ("② is wrong because …"). After shuffling,
+ * rewrite every circled mark that names a choice to that choice's number on this examinee's screen.
+ * `order[screen] = original ord` (0-based), as in PaperItem. Marks beyond the choice count stay as they are.
+ */
+export function renumberMarks(text: string, order: number[]) {
+  return text.replace(/[①-⑩]/g, (m) => {
+    const ord = MARKS.indexOf(m);
+    const screen = order.indexOf(ord);
+    return screen < 0 ? m : MARKS[screen];
+  });
+}

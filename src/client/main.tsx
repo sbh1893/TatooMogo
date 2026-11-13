@@ -24,6 +24,8 @@ if (dsn) import("@sentry/browser").then((S) => S.init({ dsn, environment: import
 
 // pdf.js is large; only the PDF review screen needs it.
 const ReviewPage = lazy(() => import("./admin/import/ReviewPage").then((m) => ({ default: m.ReviewPage })));
+// The Word reader (fflate) likewise loads only on its own screen.
+const DocxImportPage = lazy(() => import("./admin/import/DocxImportPage").then((m) => ({ default: m.DocxImportPage })));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -47,6 +49,14 @@ createRoot(document.getElementById("root")!).render(
           <Route path="admins" element={<AdminsPage />} />
           <Route path="audit-logs" element={<AuditLogsPage />} />
           <Route path="import" element={<ImportListPage />} />
+          <Route
+            path="import/word"
+            element={
+              <Suspense fallback={<p className="p-6 text-slate-500">불러오는 중…</p>}>
+                <DocxImportPage />
+              </Suspense>
+            }
+          />
           <Route
             path="import/:id"
             element={

@@ -121,8 +121,8 @@ async function loadResults(db: Db, id: number) {
       .from(attempts)
       .where(and(eq(attempts.examId, id), isNotNull(attempts.submittedAt)))
       .orderBy(asc(attempts.examineeNo)),
-    db.all<{ code: number; version: number; subject: string; correct: number; answered: number }>(sql`
-      select q.code as code, q.version as version, s.name as subject,
+    db.all<{ code: number; version: number; subject: string; difficulty: string | null; correct: number; answered: number }>(sql`
+      select q.code as code, q.version as version, s.name as subject, q.expected_difficulty as difficulty,
         count(case when c.is_correct = 1 then 1 end) as correct, count(c.id) as answered
       from exam_questions eq join questions q on q.id = eq.question_id join subjects s on s.id = q.subject_id
       left join answers an on an.exam_question_id = eq.id

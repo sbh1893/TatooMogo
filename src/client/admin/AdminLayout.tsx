@@ -27,7 +27,7 @@ export function AdminLayout() {
             시험
           </NavLink>
           <NavLink to="/admin/import" className={navClass}>
-            PDF 가져오기
+            문제 가져오기
           </NavLink>
           {/* Shown to super admins only; the server checks the role on every request anyway. */}
           {me?.role === "super_admin" && (

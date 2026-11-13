@@ -17,6 +17,9 @@ docs/samples/*.txt
 docs/reference/*.pdf
 /*.sql
 backup-*.sql
+# Question development documents are confidential: no Word files anywhere, except the fake test fixtures.
+*.docx
+!tests/fixtures/*.docx
 
 # ---- GitHub Node template (from initial commit) ----
 # Logs

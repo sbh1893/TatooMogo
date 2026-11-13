@@ -70,6 +70,15 @@ export const questions = sqliteTable(
     fixedChoices: bool("fixed_choices").notNull().default(false),
     groupKey: text("group_key"),
     status: text({ enum: ["review", "active", "disabled", "archived"] }).notNull(),
+    // Admin-only metadata from the Word import (docs/ANALYSIS.md). Never selected by the examinee API.
+    devCriterionNo: text("dev_criterion_no"), // 문항개발기준 번호
+    devItemNo: integer("dev_item_no"), // 예비문항 번호
+    devField: text("dev_field"), // 분야
+    knowledgeLevel: text("knowledge_level", { enum: ["암기형", "해석형", "문제해결형"] }),
+    expectedDifficulty: text("expected_difficulty", { enum: ["하", "중", "중상", "상"] }),
+    devIntent: text("dev_intent"), // 출제의도
+    devObjectionReview: text("dev_objection_review"), // 이의제기 예방검토
+    devBasis: text("dev_basis"), // 근거번호
     createdBy: integer("created_by").references(() => admins.id),
     createdAt: integer("created_at").notNull().$default(() => Date.now()),
     updatedAt: integer("updated_at").notNull().$default(() => Date.now()),
@@ -79,8 +88,19 @@ export const questions = sqliteTable(
     index("questions_latest_subject_status_idx").on(t.isLatest, t.subjectId, t.status),
     index("questions_source_idx").on(t.sourceFileId),
     index("questions_group_idx").on(t.groupKey),
+    index("questions_dev_key_idx").on(t.devCriterionNo, t.devItemNo),
+    index("questions_dev_field_idx").on(t.devField),
   ],
 );
+
+/** Word import: the document's 분야 → our subject, remembered for the next import. */
+export const fieldSubjects = sqliteTable("field_subjects", {
+  field: text().primaryKey(),
+  subjectId: integer("subject_id")
+    .notNull()
+    .references(() => subjects.id),
+  updatedAt: integer("updated_at").notNull().$default(() => Date.now()),
+});
 
 export const choices = sqliteTable(
   "choices",

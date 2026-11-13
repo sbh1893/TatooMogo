@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { Hono } from "hono";
 import { choices, questions, sourceFiles, subjects } from "../../db/schema";
-import { validateQuestionInput, type QuestionInput, type QuestionStatus } from "../../shared/question";
+import { validateQuestionInput, type Difficulty, type KnowledgeLevel, type QuestionInput, type QuestionStatus } from "../../shared/question";
 import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv, type Db } from "../env";
 import { auditInsert, auditInsertIf } from "./audit";
 
@@ -17,6 +17,10 @@ const codeUsedSql = (code: number) =>
   sql`exists(select 1 from exam_questions eq join attempts a on a.exam_id = eq.exam_id join questions q on q.id = eq.question_id
     where q.code = ${code})`;
 const versionIds = (code: number) => sql`(select id from questions where code = ${code})`;
+/** Word-import metadata columns; a new version carries them over unchanged. */
+export const META_COLS = sql.raw(
+  "dev_criterion_no, dev_item_no, dev_field, knowledge_level, expected_difficulty, dev_intent, dev_objection_review, dev_basis",
+);
 
 // In a D1 batch (one transaction, single writer) the row just inserted has the highest id.
 const lastQuestionId = sql`(select max(id) from questions)`;
@@ -69,6 +73,9 @@ export const questionRoutes = new Hono<AppEnv>()
     } else {
       conds.push(ne(questions.status, "archived")); // the archive is its own filter (보관함)
     }
+    if (q.field) conds.push(eq(questions.devField, q.field));
+    if (q.knowledge) conds.push(eq(questions.knowledgeLevel, q.knowledge as KnowledgeLevel));
+    if (q.difficulty) conds.push(eq(questions.expectedDifficulty, q.difficulty as Difficulty));
     const term = q.q?.trim();
     if (term) {
       // % and _ are LIKE wildcards; a search for "100%" must match the literal text.
@@ -88,6 +95,9 @@ export const questionRoutes = new Hono<AppEnv>()
           stemPreview: sql<string>`substr(${questions.stem}, 1, 80)`,
           status: questions.status,
           updatedAt: questions.updatedAt,
+          field: questions.devField,
+          knowledgeLevel: questions.knowledgeLevel,
+          difficulty: questions.expectedDifficulty,
           used: usedSql(sql.raw(`"questions"."id"`)).mapWith(Boolean),
         })
         .from(questions)
@@ -251,9 +261,9 @@ export const questionRoutes = new Hono<AppEnv>()
         // B. used: retire this row and add version + 1 (copied from the row as it is now)
         db.update(questions).set({ isLatest: false }).where(and(eq(questions.id, id), used)),
         sql`insert into questions (code, version, is_latest, subject_id, source_file_id, source_no, stem, stem_image_key,
-            explanation, fixed_choices, group_key, status, created_by, created_at, updated_at)
+            explanation, fixed_choices, group_key, status, created_by, created_at, updated_at, ${META_COLS})
           select code, version + 1, 1, ${f.subjectId}, source_file_id, source_no, ${f.stem}, ${f.stemImageKey},
-            ${f.explanation}, ${f.fixedChoices ? 1 : 0}, ${f.groupKey}, status, ${adminId}, ${now}, ${now}
+            ${f.explanation}, ${f.fixedChoices ? 1 : 0}, ${f.groupKey}, status, ${adminId}, ${now}, ${now}, ${META_COLS}
           from questions where id = ${id} and ${used}`,
         insertChoices(lastQuestionId, used),
         auditInsertIf(c, used, "question.version", { type: "question", id: sql`(select cast(max(id) as text) from questions)` }, {

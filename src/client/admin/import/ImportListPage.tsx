@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, errorMessage, type SourceFile } from "@/lib/api";
+import { ImportTabs } from "./ImportTabs";
 
 const STATUS: Record<SourceFile["status"], string> = { uploaded: "업로드됨", reviewing: "검수 중", done: "등록 완료", failed: "실패" };
 const MAX_MB = 20;
@@ -39,7 +40,8 @@ export function ImportListPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">PDF 문제지 가져오기</h1>
+      <h1 className="text-xl font-bold">문제 가져오기</h1>
+      <ImportTabs />
       <form onSubmit={submit} className="grid gap-3 rounded-lg border bg-white p-4 sm:grid-cols-[1fr_12rem_8rem_auto] sm:items-end">
         <div className="grid gap-1">
           <Label htmlFor="file">PDF 파일 (20MB 이하)</Label>

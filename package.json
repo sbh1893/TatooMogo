@@ -21,7 +21,9 @@
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "split:measure": "tsx scripts/measure-split.ts",
     "test:e2e": "playwright test",
-    "load-test": "tsx scripts/load-test.ts"
+    "load-test": "tsx scripts/load-test.ts",
+    "check-docx": "tsx scripts/check-docx.ts",
+    "make-docx-fixture": "tsx scripts/make-docx-fixture.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
@@ -30,6 +32,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
+    "fflate": "^0.8.3",
     "hono": "^4.13.18",
     "jose": "^6.2.17",
     "pdfjs-dist": "^6.5.438",
