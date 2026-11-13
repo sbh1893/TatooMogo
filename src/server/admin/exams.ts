@@ -1,7 +1,7 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { attempts, examQuestions, exams, questions, subjects } from "../../db/schema";
-import { fail, getDb, isUniqueViolation, type AppEnv } from "../env";
+import { fail, getDb, isUniqueViolation, rawBatch, type AppEnv } from "../env";
 import { auditInsert } from "./audit";
 
 /** 6 characters without look-alikes (0/O, 1/I/L), case-insensitive (ANALYSIS #23). */
@@ -192,20 +192,19 @@ export const examRoutes = new Hono<AppEnv>()
     const exam = await db.select({ layout: exams.layout }).from(exams).where(eq(exams.id, id)).get();
     if (!exam) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
     if (exam.layout !== null) return fail(c, 409, "locked", "응시가 시작된 시험은 문항 구성을 바꿀 수 없습니다.");
+    // D1 allows at most 100 bound variables per statement, so the list goes in as one JSON value.
+    const json = JSON.stringify(items.map((it) => ({ q: it.questionId, p: it.points })));
     if (items.length) {
-      const ok = await db
-        .select({ id: questions.id })
-        .from(questions)
-        .where(and(inArray(questions.id, items.map((i) => i.questionId)), eq(questions.isLatest, true), eq(questions.status, "active")));
-      if (ok.length !== items.length) return fail(c, 400, "invalid", "사용 중인 최신 문항만 넣을 수 있습니다.");
+      const ok = await db.get<{ n: number }>(sql`select count(*) as n from questions
+        where id in (select json_extract(value, '$.q') from json_each(${json})) and is_latest = 1 and status = 'active'`);
+      if (ok?.n !== items.length) return fail(c, 400, "invalid", "사용 중인 최신 문항만 넣을 수 있습니다.");
     }
     // The layout check is repeated inside the batch so a first attempt racing this request wins.
     const unlocked = sql`(select layout from exams where id = ${id}) is null`;
-    await db.batch([
+    await rawBatch(c.env, [
       db.delete(examQuestions).where(and(eq(examQuestions.examId, id), unlocked)),
-      ...(items.length
-        ? [db.insert(examQuestions).values(items.map((it, position) => ({ examId: id, questionId: it.questionId, position, points: it.points })))]
-        : []),
+      sql`insert into exam_questions (exam_id, question_id, position, points)
+        select ${id}, json_extract(value, '$.q'), key, json_extract(value, '$.p') from json_each(${json}) where ${unlocked}`,
       auditInsert(db, c, "exam.questions", { type: "exam", id: String(id) }, { count: items.length }),
     ]);
     return c.json({ id, count: items.length });

@@ -63,6 +63,24 @@ describe("admin: exams", () => {
     expect(code).toMatch(/^[2-9A-HJKMNP-Z]{6}$/);
   });
 
+  it("saves a large question list (D1 allows only 100 bound variables per statement)", async () => {
+    const n = 120;
+    await env.DB.batch(
+      Array.from({ length: n }, (_, i) =>
+        env.DB.prepare(
+          "INSERT INTO questions (id, code, version, is_latest, subject_id, stem, explanation, fixed_choices, status, created_at, updated_at) VALUES (?, ?, 1, 1, 1, ?, '', 0, 'active', 0, 0)",
+        ).bind(1000 + i, 1000 + i, `대량 ${i}`),
+      ),
+    );
+    const exam = await (await call("/api/admin/exams", { method: "POST", json: { title: "대량", timeLimitMin: 60, passSubjectPct: 40, passAvgPct: 60 } })).json<{ id: number }>();
+    const items = Array.from({ length: n }, (_, i) => ({ questionId: 1000 + i, points: (i % 3) + 1 }));
+    const res = await call(`/api/admin/exams/${exam.id}/questions`, { method: "PUT", json: { items } });
+    expect(res.status, await res.text()).toBe(200);
+    const rows = await env.DB.prepare("SELECT question_id AS q, position AS p, points FROM exam_questions WHERE exam_id = ? ORDER BY position").bind(exam.id).all();
+    expect(rows.results).toEqual(items.map((it, p) => ({ q: it.questionId, p, points: it.points })));
+    expect((await call(`/api/admin/exams/${exam.id}/open`, { method: "POST" })).status).toBe(200);
+  });
+
   it("locks the composition and most settings once someone has started", async () => {
     const exam = await setupExam();
     await enter(exam.code, "001", "홍길동");
