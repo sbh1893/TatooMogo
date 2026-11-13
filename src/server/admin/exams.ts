@@ -94,7 +94,10 @@ function parseSettings(raw: unknown, partial: boolean): { ok: true; value: Parti
   return { ok: true, value: out };
 }
 
-const attemptCount = sql<number>`(select count(*) from attempts a where a.exam_id = ${exams.id})`;
+/** A question row (alias q) that may not go into a newly opened exam. */
+const notUsable = sql`(q.is_latest = 0 or q.status <> 'active')`;
+
+const attemptCount =sql<number>`(select count(*) from attempts a where a.exam_id = ${exams.id})`;
 
 /** Scores per examinee and the correct rate per common question number (submitted attempts only). */
 async function loadResults(db: Db, id: number) {
@@ -195,7 +198,9 @@ export const examRoutes = new Hono<AppEnv>()
   .get("/:id{[0-9]+}", async (c) => {
     const db = getDb(c.env);
     const id = Number(c.req.param("id"));
-    const [[exam], items, [{ n }]] = await db.batch([
+    // Not db.batch: batch rows come back keyed by column name, and the two "id" columns here would
+    // collapse and shift every later field. Separate queries read rows positionally.
+    const [[exam], items, [{ n }]] = await Promise.all([
       db.select().from(exams).where(eq(exams.id, id)),
       db
         .select({
@@ -208,6 +213,10 @@ export const examRoutes = new Hono<AppEnv>()
           stemPreview: sql<string>`substr(${questions.stem}, 1, 80)`,
           groupKey: questions.groupKey,
           points: examQuestions.points,
+          status: questions.status,
+          isLatest: questions.isLatest,
+          // The usable version of the same common number, for "replace with latest" on the edit screen.
+          latestId: sql<number | null>`(select l.id from questions l where l.code = ${questions.code} and l.is_latest = 1 and l.status = 'active')`,
         })
         .from(examQuestions)
         .innerJoin(questions, eq(questions.id, examQuestions.questionId))
@@ -374,15 +383,36 @@ export const examRoutes = new Hono<AppEnv>()
     const action = c.req.param("action") as "open" | "close";
     const exam = await db.select({ id: exams.id, status: exams.status }).from(exams).where(eq(exams.id, id)).get();
     if (!exam) return fail(c, 404, "not_found", "시험을 찾을 수 없습니다.");
-    if (exam.status === "deleting") return fail(c, 409, "deleting", "삭제 중인 시험입니다.");
+    const deleting = () => fail(c, 409, "deleting", "삭제 중인 시험입니다.");
+    if (exam.status === "deleting") return deleting();
+    const badComposition = async () => {
+      const bad = await db.all<{ code: number; version: number; status: string; isLatest: number }>(sql`select q.code as code,
+          q.version as version, q.status as status, q.is_latest as isLatest
+        from exam_questions eq join questions q on q.id = eq.question_id
+        where eq.exam_id = ${id} and ${notUsable} order by eq.position`);
+      if (!bad.length) return null;
+      const why = (b: (typeof bad)[number]) =>
+        `#${b.code}${b.version > 1 ? ` v${b.version}` : ""}(${!b.isLatest ? "새 버전 있음" : b.status === "archived" ? "보관됨" : b.status === "disabled" ? "사용 중지" : "검수 대기"})`;
+      return fail(c, 400, "invalid_questions", `사용할 수 없는 문항이 있어 열 수 없습니다: ${bad.map(why).join(", ")}. 문항 구성에서 빼거나 최신 버전으로 바꿔 주세요.`);
+    };
+    // Only before the composition locks; a locked (already sat) exam keeps the versions it was sat with.
+    const unlocked = sql`(select layout from exams where id = ${id}) is null`;
+    let guard = sql`status <> 'deleting'`;
     if (action === "open") {
       const [{ n }] = await db.select({ n: count() }).from(examQuestions).where(eq(examQuestions.examId, id));
       if (n === 0) return fail(c, 400, "empty", "문항을 하나 이상 넣은 뒤 열 수 있습니다.");
+      const bad = (await db.get<{ unlocked: number }>(sql`select ${unlocked} as unlocked`))?.unlocked ? await badComposition() : null;
+      if (bad) return bad;
+      // Re-checked in the update itself: a question archived or a delete started in between still blocks it.
+      guard = sql`${guard} and not (${unlocked} and exists(select 1 from exam_questions eq join questions q on q.id = eq.question_id
+        where eq.exam_id = ${id} and ${notUsable}))`;
     }
     const status = action === "open" ? "open" : "closed";
-    await db.batch([
-      db.update(exams).set({ status }).where(eq(exams.id, id)),
-      auditInsert(db, c, `exam.${action}`, { type: "exam", id: String(id) }),
-    ]);
+    const res = await db.run(sql`update exams set status = ${status} where id = ${id} and ${guard}`);
+    if (!res.meta.changes) {
+      const now = await db.select({ status: exams.status }).from(exams).where(eq(exams.id, id)).get();
+      return !now || now.status === "deleting" ? deleting() : ((await badComposition()) ?? fail(c, 409, "conflict", "잠시 후 다시 시도해 주세요."));
+    }
+    await auditInsert(db, c, `exam.${action}`, { type: "exam", id: String(id) });
     return c.json({ id, status });
   });

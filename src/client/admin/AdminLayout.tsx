@@ -18,7 +18,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <header className="flex flex-wrap items-center gap-2 bg-[#1f3a5f] px-4 py-2 text-white">
-        <span className="mr-2 font-black">CBT 관리자</span>
+        <span className="mr-2 font-black">타투모고 관리자</span>
         <nav className="flex flex-wrap gap-1">
           <NavLink to="/admin/questions" className={navClass}>
             문제은행

@@ -1,4 +1,4 @@
-# TATTO_CBT_MOGO — 문신사 CBT 모의고사
+# 타투모고 (TATTO_CBT_MOGO) — 문신사 CBT 모의고사
 
 문신사 국가시험 대비 CBT 모의고사 웹 서비스입니다. React(Vite) 화면과 Hono API를 Cloudflare Worker 하나로 서빙하고, D1·R2·Access를 씁니다.
 

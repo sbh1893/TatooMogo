@@ -158,7 +158,7 @@ export function ResultPage() {
         ) : (
           <p className="foot-note">이 시험은 정답과 해설을 공개하지 않습니다.</p>
         )}
-        <p className="foot-note">TAT-Q 문신사 CBT 모의고사 · 모의고사 결과는 실제 시험 결과와 다를 수 있습니다.</p>
+        <p className="foot-note">타투모고 · 모의고사 결과는 실제 시험 결과와 다를 수 있습니다.</p>
       </div>
     </div>
   );

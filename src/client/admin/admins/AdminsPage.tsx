@@ -49,7 +49,7 @@ export function AdminsPage() {
     <section className="space-y-4">
       <h1 className="text-xl font-bold">관리자 허용 목록</h1>
       <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        관리자를 추가하거나 빼면 <b>Cloudflare Access 정책(Zero Trust → Access → Applications → CBT 관리자 → Policy)</b>의 이메일 목록도 같이 바꿔
+        관리자를 추가하거나 빼면 <b>Cloudflare Access 정책(Zero Trust → Access → Applications → 타투모고 관리자 → Policy)</b>의 이메일 목록도 같이 바꿔
         주세요. 정지는 이 화면에서 바로 반영됩니다(다음 요청부터 차단).
       </p>
       {notice && <p className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}

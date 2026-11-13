@@ -132,6 +132,88 @@ describe("question delete", () => {
   });
 });
 
+describe("opening checks the composition", () => {
+  const open = (id: number) => call(`/api/admin/exams/${id}/open`, { method: "POST" });
+  type Detail = { questions: { questionId: number; status: string; isLatest: boolean; latestId: number | null }[] };
+
+  it("refuses a draft exam holding a question archived after it was picked, naming the common number", async () => {
+    const q = await question("보관될");
+    const keep = await question("멀쩡");
+    const draft = await exam([q.id, keep.id], false); // picked while still active
+    const used = await exam([q.id]);
+    await sit(used.code, "A1");
+    await close(used.id);
+    expect(await (await del(q.id)).json()).toMatchObject({ result: "archived" });
+
+    const res = await open(draft.id);
+    expect(res.status).toBe(400);
+    const msg = await res.text();
+    expect(msg).toContain(`#${q.code}(보관됨)`);
+    expect(msg).not.toContain(`#${keep.code}`);
+    const detail = await (await call(`/api/admin/exams/${draft.id}`)).json<Detail>();
+    expect(detail.questions.find((x) => x.questionId === q.id)).toMatchObject({ status: "archived", latestId: null });
+    expect(await n("select count(*) as n from exams where id = ? and status = 'draft'", draft.id)).toBe(1);
+  });
+
+  it("refuses a draft exam holding a disabled question", async () => {
+    const q = await question("중지될");
+    const draft = await exam([q.id], false);
+    await call(`/api/admin/questions/${q.id}/disable`, { method: "POST" });
+    const res = await open(draft.id);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain(`#${q.code}(사용 중지)`);
+  });
+
+  it("refuses an older version and points at the latest, which can replace it", async () => {
+    const q = await question("고칠");
+    const draft = await exam([q.id], false);
+    const used = await exam([q.id]);
+    await sit(used.code, "A1");
+    const v2 = await (
+      await call(`/api/admin/questions/${q.id}`, {
+        method: "PUT",
+        json: { subjectId: 1, stem: "고친", explanation: "", fixedChoices: false, choices: [{ body: "정답", isCorrect: true }, { body: "오답", isCorrect: false }] },
+      })
+    ).json<{ id: number; newVersion: boolean }>();
+    expect(v2.newVersion).toBe(true);
+
+    const res = await open(draft.id);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain(`#${q.code}(새 버전 있음)`);
+    const detail = await (await call(`/api/admin/exams/${draft.id}`)).json<Detail>();
+    expect(detail.questions[0]).toMatchObject({ isLatest: false, latestId: v2.id });
+
+    await call(`/api/admin/exams/${draft.id}/questions`, { method: "PUT", json: { items: [{ questionId: v2.id }] } });
+    // ids and common numbers differ now (v2.id = 2+, code = 1): every field must line up.
+    const after = await (await call(`/api/admin/exams/${draft.id}`)).json<{ questions: { questionId: number; code: number; version: number; points: number; status: string; isLatest: boolean }[] }>();
+    expect(after.questions).toEqual([expect.objectContaining({ questionId: v2.id, code: q.code, version: 2, points: 1, status: "active", isLatest: true })]);
+    expect((await open(draft.id)).status).toBe(200);
+  });
+
+  it("a closed exam that was already sat can reopen with the versions it was sat with", async () => {
+    const q = await question("쓴");
+    const e = await exam([q.id]);
+    await sit(e.code, "A1");
+    await close(e.id);
+    await del(q.id); // archived
+    expect((await open(e.id)).status).toBe(200);
+  });
+
+  it("an exam whose delete has started can be neither opened nor closed (409)", async () => {
+    const q = await question("q");
+    const e = await exam([q.id]);
+    await sit(e.code, "A1");
+    await close(e.id);
+    examDeleteDeps.chunk = 1; // 1 answer: the first step stops before finishing
+    expect(await (await delExam(e.id)).json()).toMatchObject({ done: false });
+    expect(await n("select count(*) as n from exams where id = ? and status = 'deleting'", e.id)).toBe(1);
+
+    expect((await open(e.id)).status).toBe(409);
+    expect((await close(e.id)).status).toBe(409);
+    expect(await n("select count(*) as n from exams where id = ? and status = 'deleting'", e.id)).toBe(1);
+  });
+});
+
 describe("exam delete", () => {
   it("is for super admins only (checked on the server)", async () => {
     const e = await exam([(await question("q")).id]);

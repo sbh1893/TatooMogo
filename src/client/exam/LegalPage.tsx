@@ -20,7 +20,7 @@ export function LegalPage({ kind }: { kind: keyof typeof PAGES }) {
     <div className="cbt">
       <div className="topbar">
         <div className="brand">
-          문신사 CBT 모의고사<small>TAT-Q</small>
+          타투모고
         </div>
       </div>
       <div className="start">

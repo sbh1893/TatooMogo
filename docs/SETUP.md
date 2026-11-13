@@ -70,7 +70,7 @@ npx wrangler deploy
    - 팀 도메인은 `https://<팀이름>.cloudflareaccess.com`이 됩니다.
 2. **Settings → Authentication → Login methods → Add new → One-time PIN**을 추가합니다(이메일 일회용 코드).
 3. **Access → Applications → Add an application → Self-hosted**를 고르고 아래처럼 설정합니다.
-   - Application name: `CBT 관리자`
+   - Application name: `타투모고 관리자`
    - Session Duration: **8 hours**
    - Public hostname을 **두 개** 추가합니다(같은 도메인).
      - 경로 `admin*` — 관리자 화면

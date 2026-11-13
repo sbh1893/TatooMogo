@@ -306,6 +306,17 @@ function QuestionPicker({ exam, onSaved, onError }: { exam: ExamDetail; onSaved:
     }
   };
 
+  /** Why a picked question can't go into an opening exam (the server refuses to open with any of these). */
+  const problemOf = (questionId: number) => {
+    if (exam.locked) return null;
+    const q = exam.questions.find((x) => x.questionId === questionId);
+    if (!q) return null;
+    if (!q.isLatest) return "새 버전 있음";
+    return q.status === "archived" ? "보관됨" : q.status === "disabled" ? "사용 중지" : q.status === "review" ? "검수 대기" : null;
+  };
+  const problems = picked.filter((p) => problemOf(p.questionId)).length;
+  const replace = (from: number, to: number) => change(picked.map((x) => (x.questionId === from ? { ...x, questionId: to } : x)));
+
   const bySubject = subjects
     .map((s) => ({ s, n: picked.filter((p) => info.get(p.questionId)?.subjectId === s.id).length }))
     .filter((x) => x.n > 0);
@@ -362,20 +373,33 @@ function QuestionPicker({ exam, onSaved, onError }: { exam: ExamDetail; onSaved:
             </Button>
           )}
         </div>
+        {problems > 0 && (
+          <p className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">
+            사용할 수 없는 문항이 {problems}개 있습니다. 빼거나 최신 버전으로 바꾸고 저장해야 시험을 열 수 있습니다.
+          </p>
+        )}
         <ol className="max-h-[32rem] divide-y overflow-y-auto text-sm">
           {picked.map((p, i) => {
             const q = info.get(p.questionId);
+            const problem = problemOf(p.questionId);
+            const latestId = exam.questions.find((x) => x.questionId === p.questionId)?.latestId;
             return (
-              <li key={p.questionId} className="flex items-center gap-2 p-2">
+              <li key={p.questionId} className={`flex flex-wrap items-center gap-2 p-2 ${problem ? "bg-red-50" : ""}`} data-problem={problem ?? undefined}>
                 <span className="w-6 text-right text-slate-500">{i + 1}</span>
                 <span className="font-mono text-xs text-slate-500">
                   #{q?.code}
                   {q && q.version > 1 ? ` v${q.version}` : ""}
                 </span>
-                <span className="flex-1 truncate">
+                <span className="min-w-0 flex-1 truncate">
                   <span className="mr-1 text-xs text-slate-500">{q?.subjectName}</span>
                   {q?.stemPreview}
                 </span>
+                {problem && <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800">{problem}</span>}
+                {problem && latestId && latestId !== p.questionId && !pickedIds.has(latestId) && (
+                  <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => replace(p.questionId, latestId)}>
+                    최신으로 교체
+                  </Button>
+                )}
                 <label className="flex items-center gap-1 text-xs">
                   배점
                   <input

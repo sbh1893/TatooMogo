@@ -117,6 +117,10 @@ export type ExamQuestion = {
   stemPreview: string;
   groupKey: string | null;
   points: number;
+  status: QuestionStatus;
+  isLatest: boolean;
+  /** Latest active version of the same common number (null if none). */
+  latestId: number | null;
 };
 export type ExamMonitor = {
   exam: { id: number; title: string; code: string; status: ExamStatus; total: number };
